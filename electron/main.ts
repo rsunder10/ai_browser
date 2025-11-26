@@ -40,10 +40,16 @@ function createWindow() {
         // Cmd+Option+I on Mac, Ctrl+Shift+I on Windows/Linux
         if ((input.meta && input.alt && input.key.toLowerCase() === 'i') ||
             (input.control && input.shift && input.key.toLowerCase() === 'i')) {
-            if (mainWindow) {
+            event.preventDefault();
+
+            // Try to open DevTools for active tab's BrowserView first
+            const activeTabId = tabManager.getActiveTabId();
+            if (activeTabId) {
+                tabManager.openDevToolsForActiveTab();
+            } else if (mainWindow) {
+                // Fallback to main window DevTools (for React UI)
                 mainWindow.webContents.openDevTools({ mode: 'detach' });
             }
-            event.preventDefault();
         }
     });
 
@@ -100,6 +106,10 @@ ipcMain.handle('get-tabs', async () => {
 
 ipcMain.handle('get-active-tab', async () => {
     return tabManager.getActiveTabId();
+});
+
+ipcMain.handle('open-devtools', async () => {
+    tabManager.openDevToolsForActiveTab();
 });
 
 // App lifecycle

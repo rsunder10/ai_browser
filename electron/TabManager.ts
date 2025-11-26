@@ -1,4 +1,4 @@
-import { BrowserWindow, BrowserView } from 'electron';
+import { BrowserWindow, BrowserView, Menu, MenuItem } from 'electron';
 import { randomUUID } from 'crypto';
 
 interface TabInfo {
@@ -13,9 +13,125 @@ export class TabManager {
     private activeTabId: string | null = null;
     private readonly CHROME_HEIGHT = 100;
     private mainWindow: BrowserWindow | null = null;
+    private readonly isDevelopment = process.env.NODE_ENV === 'development';
 
     setMainWindow(window: BrowserWindow) {
         this.mainWindow = window;
+        if (this.isDevelopment) {
+            console.log('[TabManager] Main window set');
+        }
+    }
+
+    private log(...args: any[]) {
+        if (this.isDevelopment) {
+            console.log('[TabManager]', ...args);
+        }
+    }
+
+    private setupBrowserView(view: BrowserView, tabId: string): void {
+        this.log('Setting up BrowserView for tab:', tabId);
+
+        // Title updates
+        view.webContents.on('page-title-updated', (_event, title) => {
+            const tab = this.tabs.get(tabId);
+            if (tab) {
+                tab.title = title;
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('tab-updated', tabId);
+                }
+                this.log('Title updated:', title, 'for tab:', tabId);
+            }
+        });
+
+        // URL navigation
+        view.webContents.on('did-navigate', (_event, url) => {
+            const tab = this.tabs.get(tabId);
+            if (tab) {
+                tab.url = url;
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('tab-updated', tabId);
+                }
+                this.log('Navigated to:', url);
+            }
+        });
+
+        // In-page navigation
+        view.webContents.on('did-navigate-in-page', (_event, url) => {
+            const tab = this.tabs.get(tabId);
+            if (tab) {
+                tab.url = url;
+                if (this.mainWindow) {
+                    this.mainWindow.webContents.send('tab-updated', tabId);
+                }
+            }
+        });
+
+        // Add context menu support
+        view.webContents.on('context-menu', (_event, params) => {
+            this.log('Context menu triggered at:', params.x, params.y);
+            const menu = new Menu();
+
+            // Navigation options
+            menu.append(new MenuItem({
+                label: 'Back',
+                enabled: view.webContents.canGoBack(),
+                click: () => view.webContents.goBack()
+            }));
+
+            menu.append(new MenuItem({
+                label: 'Forward',
+                enabled: view.webContents.canGoForward(),
+                click: () => view.webContents.goForward()
+            }));
+
+            menu.append(new MenuItem({
+                label: 'Reload',
+                click: () => view.webContents.reload()
+            }));
+
+            menu.append(new MenuItem({ type: 'separator' }));
+
+            // Text editing options
+            if (params.isEditable) {
+                menu.append(new MenuItem({ label: 'Cut', role: 'cut' }));
+                menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
+                menu.append(new MenuItem({ label: 'Paste', role: 'paste' }));
+                menu.append(new MenuItem({ type: 'separator' }));
+            } else if (params.selectionText) {
+                menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
+                menu.append(new MenuItem({ type: 'separator' }));
+            }
+
+            // Inspect Element (always in development)
+            if (this.isDevelopment) {
+                menu.append(new MenuItem({
+                    label: 'Inspect Element',
+                    click: () => {
+                        this.log('Opening DevTools at:', params.x, params.y);
+
+                        // Open docked to right for standard Chrome feel
+                        if (!view.webContents.isDevToolsOpened()) {
+                            view.webContents.openDevTools({ mode: 'right', activate: true });
+                        }
+
+                        // Inspect the specific element
+                        view.webContents.inspectElement(params.x, params.y);
+                    }
+                }));
+            }
+
+            menu.popup();
+        });
+
+        // Error handling
+        view.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+            console.error('[TabManager] Failed to load:', errorDescription, 'Code:', errorCode);
+        });
+
+        // Log when page finishes loading
+        view.webContents.on('did-finish-load', () => {
+            this.log('Page loaded for tab:', tabId);
+        });
     }
 
     createTab(mainWindow: BrowserWindow, url: string): string {
@@ -50,10 +166,10 @@ export class TabManager {
             },
         });
 
-        // Add to window
+        // Add
         mainWindow.addBrowserView(view);
 
-        // Set bounds
+        // Position the view
         const bounds = mainWindow.getContentBounds();
         view.setBounds({
             x: 0,
@@ -62,9 +178,13 @@ export class TabManager {
             height: bounds.height - this.CHROME_HEIGHT,
         });
 
+        // Setup all event listeners
+        this.setupBrowserView(view, tabId);
+
         // Load URL with error handling
+        this.log('Loading URL:', urlString);
         view.webContents.loadURL(urlString).catch((err) => {
-            console.error(`Failed to load URL ${urlString}:`, err);
+            console.error(`[TabManager] Failed to load URL ${urlString}:`, err);
         });
 
         // Update tab info with view
@@ -75,42 +195,6 @@ export class TabManager {
 
         // Set as active and hide others
         this.switchTab(mainWindow, tabId);
-
-        // Listen for title updates
-        view.webContents.on('page-title-updated', (_event, title) => {
-            const tab = this.tabs.get(tabId);
-            if (tab) {
-                tab.title = title;
-                // Notify renderer process
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
-            }
-        });
-
-        // Listen for URL changes (navigation)
-        view.webContents.on('did-navigate', (_event, url) => {
-            const tab = this.tabs.get(tabId);
-            if (tab) {
-                tab.url = url;
-                // Notify renderer process
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
-            }
-        });
-
-        // Also listen for in-page navigation
-        view.webContents.on('did-navigate-in-page', (_event, url) => {
-            const tab = this.tabs.get(tabId);
-            if (tab) {
-                tab.url = url;
-                // Notify renderer process
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
-            }
-        });
 
         return tabId;
     }
@@ -214,41 +298,35 @@ export class TabManager {
 
             tab.view = view;
 
-            // Add event listeners for the new view
-            view.webContents.on('page-title-updated', (_event, title) => {
-                const t = this.tabs.get(tabId);
-                if (t) {
-                    t.title = title;
-                    if (this.mainWindow) {
-                        this.mainWindow.webContents.send('tab-updated', tabId);
-                    }
-                }
-            });
-
-            view.webContents.on('did-navigate', (_event, url) => {
-                const t = this.tabs.get(tabId);
-                if (t) {
-                    t.url = url;
-                    if (this.mainWindow) {
-                        this.mainWindow.webContents.send('tab-updated', tabId);
-                    }
-                }
-            });
-
-            view.webContents.on('did-navigate-in-page', (_event, url) => {
-                const t = this.tabs.get(tabId);
-                if (t) {
-                    t.url = url;
-                    if (this.mainWindow) {
-                        this.mainWindow.webContents.send('tab-updated', tabId);
-                    }
-                }
-            });
+            // Setup all event listeners using centralized method
+            this.setupBrowserView(view, tabId);
         }
 
         if (tab.view) {
             tab.view.webContents.loadURL(urlString);
             tab.url = urlString;
+        }
+    }
+
+    openDevToolsForActiveTab(): void {
+        if (!this.activeTabId) {
+            this.log('No active tab to open DevTools for');
+            return;
+        }
+
+        const tab = this.tabs.get(this.activeTabId);
+        if (!tab || !tab.view) {
+            this.log('Active tab has no BrowserView');
+            return;
+        }
+
+        this.log('Opening DevTools for active tab:', this.activeTabId);
+        if (!tab.view.webContents.isDevToolsOpened()) {
+            tab.view.webContents.openDevTools({ mode: 'right', activate: true });
+        } else {
+            this.log('DevTools already open for this tab');
+            // Focus the DevTools window if already open
+            tab.view.webContents.devToolsWebContents?.focus();
         }
     }
 
