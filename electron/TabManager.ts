@@ -2,6 +2,7 @@ import { BrowserWindow, BrowserView, Menu, MenuItem, WebContents } from 'electro
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { SettingsManager } from './managers/SettingsManager';
+import { HistoryManager } from './managers/HistoryManager';
 
 interface Tab {
     id: string;
@@ -18,12 +19,14 @@ export class TabManager {
     private activeTabId: string | null = null;
     private mainWindow: BrowserWindow | null = null;
     private settingsManager: SettingsManager;
+    private historyManager: HistoryManager;
     private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
     private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
 
-    constructor() {
+    constructor(historyManager: HistoryManager) {
         this.settingsManager = new SettingsManager();
+        this.historyManager = historyManager;
     }
 
     setMainWindow(window: BrowserWindow) {
@@ -50,7 +53,7 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
-                this.trackVisit(tab.url, undefined, title);
+                this.updatePageMetadata(tab.url, { title });
                 this.log('Title updated:', title, 'for tab:', tabId);
             }
         });
@@ -61,7 +64,7 @@ export class TabManager {
             if (tab && favicons && favicons.length > 0) {
                 // Prefer high-res icons if available, but for now just take the first one
                 const favicon = favicons[0];
-                this.trackVisit(tab.url, favicon);
+                this.updatePageMetadata(tab.url, { favicon });
                 this.log('Favicon updated:', favicon, 'for tab:', tabId);
             }
         });
@@ -74,7 +77,7 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
-                this.trackVisit(url);
+                this.recordNavigation(url);
                 this.log('Navigated to:', url);
             }
         });
@@ -87,7 +90,7 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
-                this.trackVisit(url);
+                this.recordNavigation(url);
             }
         });
 
@@ -379,7 +382,7 @@ export class TabManager {
 
     refreshTab(tabId: string): void {
         const tab = this.tabs.get(tabId);
-        if (tab) {
+        if (tab && tab.view) {
             tab.view.webContents.reload();
         }
     }
@@ -403,7 +406,7 @@ export class TabManager {
         // For now, it's in-memory
     }
 
-    trackVisit(url: string, favicon?: string, title?: string) {
+    recordNavigation(url: string) {
         if (!url || url.startsWith('neuralweb://') || url === 'about:blank') return;
 
         try {
@@ -411,15 +414,43 @@ export class TabManager {
             const current = this.visitCounts.get(domain) || { count: 0 };
 
             this.visitCounts.set(domain, {
-                count: current.count + 1,
-                favicon: favicon || current.favicon,
-                title: title || current.title
+                ...current,
+                count: current.count + 1
             });
-            this.log('Tracked visit for:', domain, 'Count:', current.count + 1);
+            this.log('Recorded visit for:', domain, 'Count:', current.count + 1);
+
+            // Add to global history
+            this.historyManager.addEntry({
+                url: url,
+                title: url, // Initial title is URL
+            });
         } catch (e) {
             // Invalid URL, ignore
         }
     }
+
+    updatePageMetadata(url: string, metadata: { title?: string, favicon?: string }) {
+        if (!url || url.startsWith('neuralweb://') || url === 'about:blank') return;
+
+        try {
+            const domain = new URL(url).hostname;
+            const current = this.visitCounts.get(domain);
+
+            if (current) {
+                this.visitCounts.set(domain, {
+                    ...current,
+                    title: metadata.title || current.title,
+                    favicon: metadata.favicon || current.favicon
+                });
+            }
+
+            // Update global history
+            this.historyManager.updateLastEntry(url, metadata);
+        } catch (e) {
+            // Invalid URL, ignore
+        }
+    }
+
 
     getTopSites(): Array<{ name: string; url: string; icon: string; color: string; favicon?: string }> {
         const sortedSites = Array.from(this.visitCounts.entries())
@@ -456,5 +487,48 @@ export class TabManager {
                 });
             }
         });
+    }
+
+    // New Features
+
+    findInPage(text: string, forward: boolean = true) {
+        if (!this.activeTabId) return;
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            tab.view.webContents.findInPage(text, { forward, findNext: true });
+        }
+    }
+
+    stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection') {
+        if (!this.activeTabId) return;
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            tab.view.webContents.stopFindInPage(action);
+        }
+    }
+
+    setZoomLevel(level: number) {
+        if (!this.activeTabId) return;
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            tab.view.webContents.setZoomLevel(level);
+        }
+    }
+
+    getZoomLevel(): number {
+        if (!this.activeTabId) return 0;
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            return tab.view.webContents.getZoomLevel();
+        }
+        return 0;
+    }
+
+    printPage() {
+        if (!this.activeTabId) return;
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            tab.view.webContents.print();
+        }
     }
 }

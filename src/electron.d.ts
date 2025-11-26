@@ -29,10 +29,34 @@ declare global {
             invoke(channel: 'downloads:cancel', id: string): Promise<void>;
             invoke(channel: 'downloads:open-file', id: string): Promise<void>;
             invoke(channel: 'downloads:clear'): Promise<void>;
+            invoke(channel: 'create-incognito-window'): Promise<void>;
+            invoke(channel: 'open-browser-menu'): Promise<void>;
+            invoke(channel: 'is-incognito'): Promise<boolean>;
+
+            // History
+            invoke(channel: 'history:get'): Promise<any[]>;
+            invoke(channel: 'history:clear'): Promise<void>;
+            invoke(channel: 'history:search', query: string): Promise<any[]>;
+
+            // Find in Page
+            invoke(channel: 'find:start', text: string): Promise<void>;
+            invoke(channel: 'find:stop', action: 'clearSelection' | 'keepSelection' | 'activateSelection'): Promise<void>;
+            invoke(channel: 'find:next', text: string): Promise<void>;
+            invoke(channel: 'find:prev', text: string): Promise<void>;
+
+            // Zoom
+            invoke(channel: 'zoom:set', level: number): Promise<void>;
+            invoke(channel: 'zoom:get'): Promise<number>;
+            invoke(channel: 'zoom:reset'): Promise<void>;
+
+            // Print
+            invoke(channel: 'print:page'): Promise<void>;
+
             invoke(channel: 'ai_query', data: { provider: string; prompt: string }): Promise<string>;
-            // invoke: (channel: string, ...args: any[]) => Promise<any>;
-            on: (channel: string, callback: (...args: any[]) => void) => void;
-            removeListener: (channel: string, callback: (...args: any[]) => void) => void;
+            invoke(channel: string, ...args: any[]): Promise<any>;
+
+            on(channel: string, func: (...args: any[]) => void): void;
+            removeListener(channel: string, func: (...args: any[]) => void): void;
         };
     }
 }

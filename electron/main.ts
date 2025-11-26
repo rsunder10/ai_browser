@@ -6,6 +6,7 @@ import { TabManager } from './TabManager';
 import { BookmarksManager } from './managers/BookmarksManager';
 import { SettingsManager } from './managers/SettingsManager';
 import { DownloadManager } from './managers/DownloadManager';
+import { HistoryManager } from './managers/HistoryManager';
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
@@ -14,6 +15,7 @@ const tabManagers = new Map<number, TabManager>();
 const bookmarksManager = new BookmarksManager();
 const settingsManager = new SettingsManager();
 const downloadManager = new DownloadManager();
+const historyManager = new HistoryManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -41,7 +43,7 @@ function createWindow(options: { incognito?: boolean } = {}) {
     windows.set(windowId, window);
 
     // Create a new TabManager for this window
-    const tabManager = new TabManager();
+    const tabManager = new TabManager(historyManager);
     tabManager.setMainWindow(window);
     tabManagers.set(windowId, tabManager);
 
@@ -201,6 +203,92 @@ ipcMain.handle('open-browser-menu', async (event) => {
                     }
                 }
             }
+        },
+        {
+            label: 'History',
+            accelerator: 'CmdOrCtrl+H',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://history');
+                    }
+                }
+            }
+        },
+        {
+            label: 'Downloads',
+            accelerator: 'CmdOrCtrl+J',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://downloads');
+                    }
+                }
+            }
+        },
+        {
+            label: 'Bookmarks',
+            accelerator: 'CmdOrCtrl+B',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://bookmarks');
+                    }
+                }
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Find in Page',
+            accelerator: 'CmdOrCtrl+F',
+            click: () => {
+                win.webContents.send('trigger-find');
+            }
+        },
+        {
+            label: 'Print',
+            accelerator: 'CmdOrCtrl+P',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) tm.printPage();
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Zoom In',
+            accelerator: 'CmdOrCtrl+Plus',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const level = tm.getZoomLevel();
+                    tm.setZoomLevel(level + 0.5);
+                }
+            }
+        },
+        {
+            label: 'Zoom Out',
+            accelerator: 'CmdOrCtrl+-',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const level = tm.getZoomLevel();
+                    tm.setZoomLevel(level - 0.5);
+                }
+            }
+        },
+        {
+            label: 'Reset Zoom',
+            accelerator: 'CmdOrCtrl+0',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) tm.setZoomLevel(0);
+            }
         }
     ]);
 
@@ -269,6 +357,70 @@ ipcMain.handle('settings:set', async (event, key, value) => {
     settingsManager.set(key, value);
     // Notify renderer of update if needed, or just let it pull
     return true;
+});
+
+// History IPC
+ipcMain.handle('history:get', async () => {
+    return historyManager.getHistory();
+});
+
+ipcMain.handle('history:clear', async () => {
+    historyManager.clearHistory();
+});
+
+ipcMain.handle('history:search', async (event, query) => {
+    return historyManager.search(query);
+});
+
+// Find in Page IPC
+ipcMain.handle('find:start', async (event, text) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.findInPage(text);
+});
+
+ipcMain.handle('find:stop', async (event, action) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.stopFindInPage(action);
+});
+
+ipcMain.handle('find:next', async (event, text) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.findInPage(text, true);
+});
+
+ipcMain.handle('find:prev', async (event, text) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.findInPage(text, false);
+});
+
+// Zoom IPC
+ipcMain.handle('zoom:set', async (event, level) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.setZoomLevel(level);
+});
+
+ipcMain.handle('zoom:get', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return 0;
+    return tm.getZoomLevel();
+});
+
+ipcMain.handle('zoom:reset', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.setZoomLevel(0);
+});
+
+// Print IPC
+ipcMain.handle('print:page', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.printPage();
 });
 
 // App lifecycle

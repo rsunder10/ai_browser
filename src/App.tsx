@@ -6,6 +6,8 @@ import HomePage from './components/HomePage';
 import SettingsPage from './components/SettingsPage';
 import BookmarksPage from './components/BookmarksPage';
 import DownloadsPage from './components/DownloadsPage';
+import HistoryPage from './components/HistoryPage';
+import FindInPage from './components/FindInPage';
 
 interface Tab {
   id: string;
@@ -19,6 +21,7 @@ function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+  const [showFindInPage, setShowFindInPage] = useState(false);
   const initialized = useRef(false);
 
   // Load tabs on mount
@@ -59,11 +62,53 @@ function App() {
 
     window.electron.on('tab-updated', handleTabUpdate);
 
+    // Listen for find trigger from menu
+    const handleTriggerFind = () => {
+      setShowFindInPage(true);
+    };
+    window.electron.on('trigger-find', handleTriggerFind);
+
     // Keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 't') {
         e.preventDefault();
         handleNewTab();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowFindInPage(true);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
+        e.preventDefault();
+        handleNavigate('neuralweb://history');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+        e.preventDefault();
+        handleNavigate('neuralweb://downloads');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        handleNavigate('neuralweb://bookmarks');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        window.electron.invoke('print:page');
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        window.electron.invoke('zoom:get').then((level: number) => {
+          window.electron.invoke('zoom:set', level + 0.5);
+        });
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault();
+        window.electron.invoke('zoom:get').then((level: number) => {
+          window.electron.invoke('zoom:set', level - 0.5);
+        });
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        window.electron.invoke('zoom:reset');
       }
     };
 
@@ -72,6 +117,7 @@ function App() {
     return () => {
       if (window.electron) {
         window.electron.removeListener('tab-updated', handleTabUpdate);
+        window.electron.removeListener('trigger-find', handleTriggerFind);
       }
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -175,8 +221,9 @@ function App() {
   const isSettingsPage = currentUrl === 'neuralweb://settings';
   const isDownloadsPage = currentUrl === 'neuralweb://downloads';
   const isBookmarksPage = currentUrl === 'neuralweb://bookmarks';
+  const isHistoryPage = currentUrl === 'neuralweb://history';
 
-  console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage });
+  console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage, isHistoryPage });
 
   return (
     <div className="app">
@@ -197,7 +244,8 @@ function App() {
         {isSettingsPage && <SettingsPage />}
         {isDownloadsPage && <DownloadsPage />}
         {isBookmarksPage && <BookmarksPage onNavigate={handleNavigate} />}
-        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && (
+        {isHistoryPage && <HistoryPage onNavigate={handleNavigate} />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>
@@ -209,6 +257,10 @@ function App() {
         onToggle={() => setAiSidebarOpen(!aiSidebarOpen)}
         currentUrl={currentUrl}
       />
+
+      {showFindInPage && (
+        <FindInPage onClose={() => setShowFindInPage(false)} />
+      )}
 
       <div className="status-bar">
         <span className="status-text">

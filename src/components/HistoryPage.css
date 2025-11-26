@@ -1,0 +1,248 @@
+.history-page {
+    height: 100%;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.history-header {
+    background-color: white;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.history-title {
+    display: flex;
+    align-items: center;
+    color: #1f2937;
+}
+
+.history-title h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.history-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: #f3f4f6;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    width: 300px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.search-bar:focus-within {
+    background-color: white;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.search-bar input {
+    background: transparent;
+    border: none;
+    outline: none;
+    margin-left: 0.5rem;
+    width: 100%;
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+
+.clear-history-btn {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #ef4444;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-history-btn:hover {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.history-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.history-group {
+    margin-bottom: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.history-date {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    padding: 1rem 1.5rem;
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-item:hover {
+    background-color: #f9fafb;
+}
+
+.history-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    width: 60px;
+    flex-shrink: 0;
+}
+
+.history-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.history-icon img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.history-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-entry-title {
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-entry-url {
+    font-size: 0.75rem;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #9ca3af;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .history-page {
+        background-color: #111827;
+    }
+
+    .history-header {
+        background-color: #1f2937;
+        border-color: #374151;
+    }
+
+    .history-title {
+        color: #f3f4f6;
+    }
+
+    .search-bar {
+        background-color: #374151;
+    }
+
+    .search-bar:focus-within {
+        background-color: #4b5563;
+    }
+
+    .search-bar input {
+        color: #f3f4f6;
+    }
+
+    .clear-history-btn {
+        background-color: #1f2937;
+        border-color: #374151;
+        color: #f87171;
+    }
+
+    .clear-history-btn:hover {
+        background-color: #2d3748;
+    }
+
+    .history-group {
+        background-color: #1f2937;
+        box-shadow: none;
+        border: 1px solid #374151;
+    }
+
+    .history-date {
+        background-color: #2d3748;
+        border-color: #374151;
+        color: #9ca3af;
+    }
+
+    .history-item {
+        border-color: #374151;
+    }
+
+    .history-item:hover {
+        background-color: #2d3748;
+    }
+
+    .history-entry-title {
+        color: #f3f4f6;
+    }
+
+    .history-entry-url {
+        color: #9ca3af;
+    }
+}

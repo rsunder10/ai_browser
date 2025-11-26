@@ -30,6 +30,17 @@ contextBridge.exposeInMainWorld('electron', {
             'create-incognito-window',
             'open-browser-menu',
             'is-incognito',
+            'history:get',
+            'history:clear',
+            'history:search',
+            'find:start',
+            'find:stop',
+            'find:next',
+            'find:prev',
+            'zoom:set',
+            'zoom:get',
+            'zoom:reset',
+            'print:page',
         ];
 
         if (validChannels.includes(channel)) {
@@ -37,14 +48,14 @@ contextBridge.exposeInMainWorld('electron', {
         }
     },
     on: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated'];
+        const validChannels = ['tab-updated', 'trigger-find'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (_event, ...args) => callback(...args));
         }
     },
     removeListener: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated'];
+        const validChannels = ['tab-updated', 'trigger-find'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.removeListener(channel, callback);
