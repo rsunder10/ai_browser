@@ -2,7 +2,22 @@
 declare global {
     interface Window {
         electron: {
-            invoke: (channel: string, ...args: any[]) => Promise<any>;
+            //    invoke(channel: 'create-tab', url: string): Promise<string>;
+            invoke(channel: 'close-tab', tabId: string): Promise<void>;
+            invoke(channel: 'switch-tab', tabId: string): Promise<void>;
+            invoke(channel: 'navigate-tab', tabId: string, url: string): Promise<void>;
+            invoke(channel: 'go-back', tabId: string): Promise<void>;
+            invoke(channel: 'go-forward', tabId: string): Promise<void>;
+            invoke(channel: 'refresh-tab', tabId: string): Promise<void>;
+            invoke(channel: 'get-tabs'): Promise<any[]>;
+            invoke(channel: 'get-active-tab'): Promise<string | null>;
+            invoke(channel: 'open-devtools'): Promise<void>;
+            invoke(channel: 'get-top-sites'): Promise<any[]>;
+            invoke(channel: 'bookmarks:get'): Promise<any[]>;
+            invoke(channel: 'bookmarks:add', bookmark: any): Promise<any>;
+            invoke(channel: 'bookmarks:remove', id: string): Promise<boolean>;
+            invoke(channel: 'bookmarks:check', url: string): Promise<boolean>;
+            // invoke: (channel: string, ...args: any[]) => Promise<any>;
             on: (channel: string, callback: (...args: any[]) => void) => void;
             removeListener: (channel: string, callback: (...args: any[]) => void) => void;
         };

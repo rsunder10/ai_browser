@@ -2,8 +2,11 @@ import { app, BrowserWindow, BrowserView, ipcMain } from 'electron';
 import * as path from 'path';
 import { TabManager } from './TabManager';
 
+import { BookmarksManager } from './managers/BookmarksManager';
+
 let mainWindow: BrowserWindow | null = null;
 const tabManager = new TabManager();
+const bookmarksManager = new BookmarksManager();
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -122,6 +125,23 @@ ipcMain.handle('open-devtools', async () => {
 
 ipcMain.handle('get-top-sites', async () => {
     return tabManager.getTopSites();
+});
+
+// Bookmarks IPC
+ipcMain.handle('bookmarks:get', async () => {
+    return bookmarksManager.getTree();
+});
+
+ipcMain.handle('bookmarks:add', async (event, bookmark) => {
+    return bookmarksManager.addBookmark(bookmark);
+});
+
+ipcMain.handle('bookmarks:remove', async (event, id) => {
+    return bookmarksManager.removeBookmark(id);
+});
+
+ipcMain.handle('bookmarks:check', async (event, url) => {
+    return bookmarksManager.isBookmarked(url);
 });
 
 // App lifecycle

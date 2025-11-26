@@ -28,27 +28,29 @@ body {
 
 /* Browser Chrome */
 .browser-chrome {
-  background: #292a2d;
-  border-bottom: 1px solid #3c4043;
+  background: #dfe1e5;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Tab Bar */
 .tab-bar {
   display: flex;
   align-items: center;
-  background: #292a2d;
-  padding: 4px 4px 0 4px;
-  gap: 2px;
+  background: #dfe1e5;
+  padding: 8px 8px 0 8px;
+  gap: 4px;
+  height: 40px;
 }
 
 .tabs-container {
   display: flex;
   flex: 1;
-  gap: 2px;
+  gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
-  align-items: center;
-  scrollbar-width: none;
+  align-items: flex-end;
+  height: 100%;
 }
 
 .tabs-container::-webkit-scrollbar {
@@ -59,21 +61,44 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #3c4043;
+  padding: 0 12px;
+  background: transparent;
   border-radius: 8px 8px 0 0;
-  min-width: 150px;
+  min-width: 120px;
   max-width: 240px;
-  cursor: pointer;
-  transition: background 0.2s;
+  height: 32px;
+  cursor: default;
+  transition: background 0.1s;
+  position: relative;
+  color: #3c4043;
+  font-size: 12px;
 }
 
 .tab:hover {
-  background: #48494c;
+  background: #edeff1;
 }
 
 .tab.active {
-  background: #202124;
+  background: #ffffff;
+  color: #202124;
+  height: 36px; /* Slightly taller to connect with toolbar */
+  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+  z-index: 1;
+}
+
+.tab::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 25%;
+  height: 50%;
+  width: 1px;
+  background: #9aa0a6;
+}
+
+.tab.active::after,
+.tab:hover::after {
+  display: none;
 }
 
 .tab-title {
@@ -81,49 +106,54 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
 }
 
 .tab-close {
   background: none;
   border: none;
-  color: #9aa0a6;
-  font-size: 20px;
+  color: #5f6368;
   cursor: pointer;
-  padding: 0;
+  padding: 2px;
   width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background 0.2s;
+  border-radius: 50%;
+  opacity: 0; /* Hidden by default */
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 1;
 }
 
 .tab-close:hover {
-  background: #5f6368;
-  color: #e8eaed;
+  background: #e8eaed;
+  color: #202124;
 }
 
 .new-tab-btn {
   background: none;
   border: none;
-  color: #9aa0a6;
-  font-size: 24px;
+  color: #5f6368;
   cursor: pointer;
-  padding: 4px 12px;
-  border-radius: 4px;
+  padding: 6px;
+  border-radius: 50%;
   transition: background 0.2s;
-  height: 32px;
+  height: 28px;
+  width: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-left: 4px;
+  margin-bottom: 4px;
 }
 
 .new-tab-btn:hover {
-  background: #3c4043;
-  color: #e8eaed;
+  background: #edeff1;
+  color: #202124;
 }
 
 /* Toolbar */
@@ -132,7 +162,9 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #292a2d;
+  background: #ffffff;
+  border-bottom: 1px solid #dfe1e5;
+  height: 44px;
 }
 
 /* Navigation Controls */
@@ -144,22 +176,26 @@ body {
 .nav-btn {
   background: none;
   border: none;
-  color: #9aa0a6;
-  font-size: 18px;
+  color: #5f6368;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 6px;
+  border-radius: 50%;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
 }
 
 .nav-btn:hover:not(:disabled) {
-  background: #3c4043;
-  color: #e8eaed;
+  background: #f1f3f4;
+  color: #202124;
 }
 
 .nav-btn:disabled {
   opacity: 0.3;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 /* Address Bar */
@@ -167,42 +203,54 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #3c4043;
+  gap: 12px;
+  background: #f1f3f4;
   border-radius: 20px;
-  padding: 0 12px;
-  height: 36px;
+  padding: 0 16px;
+  height: 32px;
+  border: 1px solid transparent;
+  transition: background 0.2s, border 0.2s, box-shadow 0.2s;
+}
+
+.address-bar:focus-within {
+  background: #ffffff;
+  border: 1px solid #1a73e8;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .ssl-indicator {
-  font-size: 14px;
+  color: #5f6368;
 }
 
 .url-input {
   flex: 1;
   background: none;
   border: none;
-  color: #e8eaed;
+  color: #202124;
   font-size: 14px;
   outline: none;
 }
 
 .url-input::placeholder {
-  color: #9aa0a6;
+  color: #5f6368;
 }
 
 .bookmark-btn {
   background: none;
   border: none;
-  color: #9aa0a6;
-  font-size: 18px;
+  color: #5f6368;
   cursor: pointer;
   padding: 4px;
-  transition: color 0.2s;
+  border-radius: 50%;
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bookmark-btn:hover {
-  color: #ffd700;
+  background: #e8eaed;
+  color: #202124;
 }
 
 /* AI Sidebar */
@@ -466,4 +514,49 @@ body {
   padding: 4px 12px;
   font-size: 12px;
   color: #9aa0a6;
+}
+/* Bookmarks Bar */
+.bookmarks-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #ffffff;
+  border-bottom: 1px solid #dfe1e5;
+  height: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bookmarks-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #3c4043;
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: 150px;
+  transition: background 0.2s;
+}
+
+.bookmark-item:hover {
+  background: #e8eaed;
+}
+
+.bookmark-folder-icon {
+  color: #5f6368;
+}
+
+.bookmark-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

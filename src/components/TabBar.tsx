@@ -1,4 +1,5 @@
 import React from 'react';
+import { X, Plus } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -32,12 +33,12 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                                 onTabClose(tab.id);
                             }}
                         >
-                            ×
+                            <X size={14} />
                         </button>
                     </div>
                 ))}
                 <button className="new-tab-btn" onClick={onNewTab} title="New Tab">
-                    +
+                    <Plus size={18} />
                 </button>
             </div>
         </div>

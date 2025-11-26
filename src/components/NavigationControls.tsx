@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowLeft, ArrowRight, RotateCw, Home } from 'lucide-react';
 
 interface NavigationControlsProps {
     canGoBack: boolean;
@@ -25,7 +26,7 @@ export default function NavigationControls({
                 disabled={!canGoBack}
                 title="Back"
             >
-                ←
+                <ArrowLeft size={18} />
             </button>
             <button
                 className="nav-btn"
@@ -33,21 +34,21 @@ export default function NavigationControls({
                 disabled={!canGoForward}
                 title="Forward"
             >
-                →
+                <ArrowRight size={18} />
             </button>
             <button
                 className="nav-btn"
                 onClick={onRefresh}
                 title="Refresh"
             >
-                ⟳
+                <RotateCw size={16} />
             </button>
             <button
                 className="nav-btn"
                 onClick={onHome}
                 title="Home"
             >
-                ⌂
+                <Home size={16} />
             </button>
         </div>
     );
