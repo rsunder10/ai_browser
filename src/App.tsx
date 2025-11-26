@@ -8,6 +8,7 @@ import BookmarksPage from './components/BookmarksPage';
 import DownloadsPage from './components/DownloadsPage';
 import HistoryPage from './components/HistoryPage';
 import FindInPage from './components/FindInPage';
+import { SiteSettingsPage } from './components/SiteSettingsPage';
 
 interface Tab {
   id: string;
@@ -222,6 +223,7 @@ function App() {
   const isDownloadsPage = currentUrl === 'neuralweb://downloads';
   const isBookmarksPage = currentUrl === 'neuralweb://bookmarks';
   const isHistoryPage = currentUrl === 'neuralweb://history';
+  const isSiteSettingsPage = currentUrl === 'neuralweb://settings/site';
 
   console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage, isHistoryPage });
 
@@ -245,7 +247,8 @@ function App() {
         {isDownloadsPage && <DownloadsPage />}
         {isBookmarksPage && <BookmarksPage onNavigate={handleNavigate} />}
         {isHistoryPage && <HistoryPage onNavigate={handleNavigate} />}
-        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && (
+        {isSiteSettingsPage && <SiteSettingsPage />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && !isSiteSettingsPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>

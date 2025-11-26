@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle } from 'lucide-react';
 
 interface SettingsData {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
@@ -43,6 +43,8 @@ export default function SettingsPage() {
                     <a href="#search" className="active">Search Engine</a>
                     <a href="#appearance">Appearance</a>
                     <a href="#startup">On Startup</a>
+                    <a href="#privacy">Privacy & Security</a>
+                    <a href="#extensions">Extensions</a>
                 </nav>
             </div>
 
@@ -87,6 +89,38 @@ export default function SettingsPage() {
                             onChange={(e) => updateSetting('homePage', e.target.value)}
                             placeholder="neuralweb://home"
                         />
+                    </div>
+                </section>
+
+                <section id="privacy" className="settings-section">
+                    <h2><Shield size={20} /> Privacy & Security</h2>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Site Settings</label>
+                            <p>Manage permissions for sites you visit</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={() => window.location.href = 'neuralweb://settings/site'}
+                        >
+                            Manage Permissions
+                        </button>
+                    </div>
+                </section>
+
+                <section id="extensions" className="settings-section">
+                    <h2><Puzzle size={20} /> Extensions</h2>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Manage Extensions</label>
+                            <p>Add, remove, and configure browser extensions</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={() => window.location.href = 'neuralweb://extensions'}
+                        >
+                            Open Extensions
+                        </button>
                     </div>
                 </section>
             </div>

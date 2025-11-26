@@ -1,0 +1,119 @@
+.settings-page {
+    height: 100%;
+    display: flex;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.settings-sidebar {
+    width: 250px;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    padding-left: 12px;
+}
+
+.settings-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-nav a {
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.settings-nav a:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.settings-nav a.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.settings-content {
+    flex: 1;
+    padding: 40px 60px;
+    overflow-y: auto;
+}
+
+.settings-section {
+    margin-bottom: 48px;
+    scroll-margin-top: 40px;
+}
+
+.settings-section h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 24px 0;
+    font-size: 18px;
+    font-weight: 500;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.setting-info p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.setting-item select,
+.setting-item input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    min-width: 200px;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.action-btn:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--text-secondary);
+}

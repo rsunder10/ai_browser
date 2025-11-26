@@ -1,0 +1,116 @@
+.settings-page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.settings-header {
+    padding: 20px 40px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.settings-content {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.permissions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.permission-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background-color: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.site-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.site-info h3 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.permission-badge {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background-color: var(--bg-primary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: capitalize;
+}
+
+.permission-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-select {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.status-select.allow {
+    color: #4caf50;
+    border-color: #4caf50;
+}
+
+.status-select.deny {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+.delete-btn {
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    background-color: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-btn:hover {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px;
+    color: var(--text-secondary);
+}
+
+.empty-state h2 {
+    margin: 16px 0 8px 0;
+    color: var(--text-primary);
+}

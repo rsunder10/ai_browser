@@ -24,6 +24,17 @@ declare global {
             invoke(channel: 'open-browser-menu'): Promise<void>;
             invoke(channel: 'is-incognito'): Promise<boolean>;
             invoke(channel: 'downloads:get-history'): Promise<any[]>;
+            invoke(channel: 'extensions:install', path: string): Promise<any>;
+            invoke(channel: 'extensions:remove', name: string): Promise<void>;
+
+            // Passwords
+            invoke(channel: 'passwords:save', data: { url: string; username: string; password: string }): Promise<boolean>;
+            invoke(channel: 'passwords:get', url: string): Promise<Array<{ username: string; password: string }>>;
+
+            // Permissions
+            invoke(channel: 'permissions:get-all'): Promise<Array<{ origin: string; permission: string; status: 'allow' | 'deny' | 'prompt' }>>;
+            invoke(channel: 'permissions:set', data: { origin: string; permission: string; status: 'allow' | 'deny' | 'prompt' }): Promise<void>;
+            invoke(channel: 'permissions:clear', origin: string): Promise<void>;
             invoke(channel: 'downloads:pause', id: string): Promise<void>;
             invoke(channel: 'downloads:resume', id: string): Promise<void>;
             invoke(channel: 'downloads:cancel', id: string): Promise<void>;

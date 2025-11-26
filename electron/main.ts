@@ -7,6 +7,9 @@ import { BookmarksManager } from './managers/BookmarksManager';
 import { SettingsManager } from './managers/SettingsManager';
 import { DownloadManager } from './managers/DownloadManager';
 import { HistoryManager } from './managers/HistoryManager';
+import { ExtensionsManager } from './managers/ExtensionsManager';
+import { PasswordManager } from './managers/PasswordManager';
+import { PermissionsManager } from './managers/PermissionsManager';
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
@@ -16,6 +19,9 @@ const bookmarksManager = new BookmarksManager();
 const settingsManager = new SettingsManager();
 const downloadManager = new DownloadManager();
 const historyManager = new HistoryManager();
+const extensionsManager = new ExtensionsManager();
+const passwordManager = new PasswordManager();
+const permissionsManager = new PermissionsManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -49,6 +55,26 @@ function createWindow(options: { incognito?: boolean } = {}) {
 
     // Update download manager to track this window (simplified for now, might need better multi-window handling)
     downloadManager.setMainWindow(window);
+
+    // Handle permissions
+    window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+        const url = webContents.getURL();
+        const origin = new URL(url).origin;
+        const storedPermission = permissionsManager.getPermission(origin, permission);
+
+        if (storedPermission === 'allow') {
+            callback(true);
+        } else if (storedPermission === 'deny') {
+            callback(false);
+        } else {
+            // For now, auto-approve to avoid blocking, but in real app we'd show a prompt
+            // TODO: Implement permission prompt UI
+            if (permission !== 'openExternal') {
+                console.log(`Permission requested: ${permission} for ${origin}`);
+            }
+            callback(true);
+        }
+    });
 
     // Handle downloads for this window's session
     window.webContents.session.on('will-download', (event, item, webContents) => {
@@ -191,19 +217,6 @@ ipcMain.handle('open-browser-menu', async (event) => {
                 createWindow({ incognito: true });
             }
         },
-        { type: 'separator' },
-        {
-            label: 'Settings',
-            click: () => {
-                const tm = getTabManager(event);
-                if (tm) {
-                    const activeTabId = tm.getActiveTabId();
-                    if (activeTabId) {
-                        tm.navigateTab(activeTabId, 'neuralweb://settings');
-                    }
-                }
-            }
-        },
         {
             label: 'History',
             accelerator: 'CmdOrCtrl+H',
@@ -239,6 +252,43 @@ ipcMain.handle('open-browser-menu', async (event) => {
                     const activeTabId = tm.getActiveTabId();
                     if (activeTabId) {
                         tm.navigateTab(activeTabId, 'neuralweb://bookmarks');
+                    }
+                }
+            }
+        },
+        {
+            label: 'Extensions',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://extensions');
+                    }
+                }
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Settings',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://settings');
+                    }
+                }
+            }
+        },
+        {
+            label: 'Site Settings',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://settings/site');
                     }
                 }
             }
