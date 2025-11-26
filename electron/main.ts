@@ -207,6 +207,13 @@ ipcMain.handle('open-browser-menu', async (event) => {
     menu.popup({ window: win });
 });
 
+ipcMain.handle('is-incognito', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return false;
+    // Incognito sessions are not persistent
+    return !win.webContents.session.isPersistent();
+});
+
 // Bookmarks IPC
 ipcMain.handle('bookmarks:get', async () => {
     return bookmarksManager.getTree();

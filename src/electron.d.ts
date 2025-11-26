@@ -22,6 +22,7 @@ declare global {
             invoke(channel: 'settings:set', key: string, value: any): Promise<boolean>;
             invoke(channel: 'create-incognito-window'): Promise<void>;
             invoke(channel: 'open-browser-menu'): Promise<void>;
+            invoke(channel: 'is-incognito'): Promise<boolean>;
             invoke(channel: 'downloads:get-history'): Promise<any[]>;
             invoke(channel: 'downloads:pause', id: string): Promise<void>;
             invoke(channel: 'downloads:resume', id: string): Promise<void>;

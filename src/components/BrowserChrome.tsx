@@ -1,10 +1,11 @@
 
+import { useState, useEffect } from 'react';
 import TabBar from './TabBar';
 import NavigationControls from './NavigationControls';
 import AddressBar from './AddressBar';
 import BookmarksBar from './BookmarksBar';
 import BrowserMenu from './BrowserMenu';
-import { Download, Book } from 'lucide-react';
+import { Download, Book, EyeOff } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -44,8 +45,16 @@ export default function BrowserChrome({
     const canGoForward = activeTab ? activeTab.history_index < activeTab.history.length - 1 : false;
     const currentUrl = activeTab?.url || '';
 
+    const [isIncognito, setIsIncognito] = useState(false);
+
+    useEffect(() => {
+        if (window.electron) {
+            window.electron.invoke('is-incognito').then(setIsIncognito);
+        }
+    }, []);
+
     return (
-        <div className="browser-chrome">
+        <div className={`browser-chrome ${isIncognito ? 'incognito' : ''}`}>
             <TabBar
                 tabs={tabs}
                 activeTabId={activeTabId}
@@ -68,6 +77,12 @@ export default function BrowserChrome({
                     pageTitle={activeTab?.title || ''}
                     onNavigate={onNavigate}
                 />
+                {isIncognito && (
+                    <div className="incognito-badge" title="Incognito Mode">
+                        <EyeOff size={16} />
+                        <span>Incognito</span>
+                    </div>
+                )}
                 <button
                     className="settings-btn"
                     onClick={() => onNavigate('neuralweb://downloads')}

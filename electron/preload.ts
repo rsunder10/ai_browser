@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electron', {
             'downloads:clear',
             'create-incognito-window',
             'open-browser-menu',
+            'is-incognito',
         ];
 
         if (validChannels.includes(channel)) {
