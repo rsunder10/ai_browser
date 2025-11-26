@@ -1,19 +1,30 @@
-import { BrowserWindow, BrowserView, Menu, MenuItem } from 'electron';
+import { BrowserWindow, BrowserView, Menu, MenuItem, WebContents } from 'electron';
 import { randomUUID } from 'crypto';
+import * as path from 'path';
+import { SettingsManager } from './managers/SettingsManager';
 
-interface TabInfo {
+interface Tab {
     id: string;
-    url: string;
-    title: string;
     view: BrowserView;
+    title: string;
+    url: string;
+    favicon?: string;
+    history: string[];
+    historyIndex: number;
 }
 
 export class TabManager {
-    private tabs: Map<string, TabInfo> = new Map();
+    private tabs: Map<string, Tab> = new Map();
     private activeTabId: string | null = null;
-    private readonly CHROME_HEIGHT = 100;
     private mainWindow: BrowserWindow | null = null;
+    private settingsManager: SettingsManager;
+    private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
+    private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
+
+    constructor() {
+        this.settingsManager = new SettingsManager();
+    }
 
     setMainWindow(window: BrowserWindow) {
         this.mainWindow = window;
@@ -152,15 +163,17 @@ export class TabManager {
         const tabId = `tab-${randomUUID()}`;
 
         // Store tab info first
-        const tabInfo: TabInfo = {
+        const tabInfo: Tab = {
             id: tabId,
             url: url,
-            title: url === 'neuralweb://home' ? 'Home' : url,
+            title: url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : url),
             view: null as any, // Will be set for non-home pages
+            history: [],
+            historyIndex: 0
         };
 
-        // Handle special neuralweb://home protocol
-        if (url === 'neuralweb://home') {
+        // Handle special neuralweb:// protocol
+        if (url.startsWith('neuralweb://')) {
             this.tabs.set(tabId, tabInfo);
             this.switchTab(mainWindow, tabId);
             return tabId;
@@ -265,20 +278,20 @@ export class TabManager {
         this.activeTabId = tabId;
     }
 
-    navigateTab(tabId: string, url: string): void {
+    navigateTab(tabId: string, url: string) {
         const tab = this.tabs.get(tabId);
         if (!tab) return;
 
-        // Handle navigation to home page
-        if (url === 'neuralweb://home') {
+        // Handle navigation to internal pages
+        if (url.startsWith('neuralweb://')) {
             // Remove existing view if present
             if (tab.view && this.mainWindow) {
                 this.mainWindow.removeBrowserView(tab.view);
                 (tab.view.webContents as any).destroy();
             }
             tab.view = null as any;
-            tab.url = 'neuralweb://home';
-            tab.title = 'Home';
+            tab.url = url;
+            tab.title = url === 'neuralweb://home' ? 'Home' : 'Settings'; // Simple title logic for now
 
             // Notify renderer
             if (this.mainWindow) {
@@ -366,12 +379,12 @@ export class TabManager {
     }
 
     getTabs(): Array<{ id: string; url: string; title: string; history: string[]; history_index: number }> {
-        return Array.from(this.tabs.values()).map((tab) => ({
+        return Array.from(this.tabs.values()).map(tab => ({
             id: tab.id,
             url: tab.url,
             title: tab.title,
-            history: [tab.url], // Simplified for now
-            history_index: 0,
+            history: tab.history,
+            history_index: tab.historyIndex
         }));
     }
 
@@ -379,13 +392,16 @@ export class TabManager {
         return this.activeTabId;
     }
 
-    private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
+    private async loadVisitCounts() {
+        // Load visit counts from disk if persistence is implemented
+        // For now, it's in-memory
+    }
 
-    private trackVisit(url: string, favicon?: string, title?: string) {
+    trackVisit(url: string, favicon?: string, title?: string) {
         if (!url || url.startsWith('neuralweb://') || url === 'about:blank') return;
 
         try {
-            const domain = new URL(url).origin;
+            const domain = new URL(url).hostname;
             const current = this.visitCounts.get(domain) || { count: 0 };
 
             this.visitCounts.set(domain, {
@@ -393,10 +409,9 @@ export class TabManager {
                 favicon: favicon || current.favicon,
                 title: title || current.title
             });
-
             this.log('Tracked visit for:', domain, 'Count:', current.count + 1);
         } catch (e) {
-            // Ignore invalid URLs
+            // Invalid URL, ignore
         }
     }
 

@@ -3,10 +3,20 @@ import * as path from 'path';
 import { TabManager } from './TabManager';
 
 import { BookmarksManager } from './managers/BookmarksManager';
+import { SettingsManager } from './managers/SettingsManager';
 
 let mainWindow: BrowserWindow | null = null;
 const tabManager = new TabManager();
 const bookmarksManager = new BookmarksManager();
+const settingsManager = new SettingsManager();
+
+// ... (createWindow function remains the same)
+
+// IPC Handlers
+// ... (existing handlers)
+
+// Bookmarks IPC
+// IPC Handlers moved to bottom
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -142,6 +152,17 @@ ipcMain.handle('bookmarks:remove', async (event, id) => {
 
 ipcMain.handle('bookmarks:check', async (event, url) => {
     return bookmarksManager.isBookmarked(url);
+});
+
+// Settings IPC
+ipcMain.handle('settings:get', async () => {
+    return settingsManager.getSettings();
+});
+
+ipcMain.handle('settings:set', async (event, key, value) => {
+    settingsManager.set(key, value);
+    // Notify renderer of update if needed, or just let it pull
+    return true;
 });
 
 // App lifecycle

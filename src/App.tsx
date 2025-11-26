@@ -3,6 +3,7 @@ import './App.css';
 import BrowserChrome from './components/BrowserChrome';
 import AISidebar from './components/AISidebar';
 import HomePage from './components/HomePage';
+import SettingsPage from './components/SettingsPage';
 
 interface Tab {
   id: string;
@@ -166,9 +167,10 @@ function App() {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const currentUrl = activeTab?.url || '';
   const isHomePage = currentUrl === 'neuralweb://home';
+  const isSettingsPage = currentUrl === 'neuralweb://settings';
 
   return (
-    <div className="app-container">
+    <div className="app">
       <BrowserChrome
         tabs={tabs}
         activeTabId={activeTabId}
@@ -181,19 +183,15 @@ function App() {
         onRefresh={handleRefresh}
         onHome={handleHome}
       />
-
-      {isHomePage ? (
-        <HomePage onNavigate={handleNavigate} />
-      ) : (
-        <div className="content-placeholder">
-          <p className="info-text">
-            🌐 Tab content renders below this chrome
-          </p>
-          <p className="info-text-small">
-            Using Electron BrowserView for native Chromium rendering
-          </p>
-        </div>
-      )}
+      <div className="content-area">
+        {isHomePage && <HomePage onNavigate={handleNavigate} />}
+        {isSettingsPage && <SettingsPage />}
+        {!isHomePage && !isSettingsPage && (
+          <div className="web-content-placeholder">
+            {/* BrowserView is overlaid here by Electron */}
+          </div>
+        )}
+      </div>
 
       <AISidebar
         isOpen={aiSidebarOpen}

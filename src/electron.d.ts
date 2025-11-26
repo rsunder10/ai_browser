@@ -2,7 +2,7 @@
 declare global {
     interface Window {
         electron: {
-            //    invoke(channel: 'create-tab', url: string): Promise<string>;
+            invoke(channel: 'create-tab', url: string): Promise<string>;
             invoke(channel: 'close-tab', tabId: string): Promise<void>;
             invoke(channel: 'switch-tab', tabId: string): Promise<void>;
             invoke(channel: 'navigate-tab', tabId: string, url: string): Promise<void>;
@@ -17,6 +17,8 @@ declare global {
             invoke(channel: 'bookmarks:add', bookmark: any): Promise<any>;
             invoke(channel: 'bookmarks:remove', id: string): Promise<boolean>;
             invoke(channel: 'bookmarks:check', url: string): Promise<boolean>;
+            invoke(channel: 'settings:get'): Promise<any>;
+            invoke(channel: 'settings:set', key: string, value: any): Promise<boolean>;
             // invoke: (channel: string, ...args: any[]) => Promise<any>;
             on: (channel: string, callback: (...args: any[]) => void) => void;
             removeListener: (channel: string, callback: (...args: any[]) => void) => void;
