@@ -12,6 +12,21 @@ contextBridge.exposeInMainWorld('electron', {
             'refresh-tab',
             'get-tabs',
             'get-active-tab',
+            'open-devtools',
+            'get-top-sites',
+            'bookmarks:get',
+            'bookmarks:add',
+            'bookmarks:remove',
+            'bookmarks:check',
+            'bookmarks:getByUrl',
+            'settings:get',
+            'settings:set',
+            'downloads:get-history',
+            'downloads:pause',
+            'downloads:resume',
+            'downloads:cancel',
+            'downloads:open-file',
+            'downloads:clear',
         ];
 
         if (validChannels.includes(channel)) {

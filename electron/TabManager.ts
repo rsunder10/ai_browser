@@ -166,7 +166,10 @@ export class TabManager {
         const tabInfo: Tab = {
             id: tabId,
             url: url,
-            title: url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : (url === 'neuralweb://downloads' ? 'Downloads' : url)),
+            title: url === 'neuralweb://home' ? 'Home' :
+                (url === 'neuralweb://settings' ? 'Settings' :
+                    (url === 'neuralweb://downloads' ? 'Downloads' :
+                        (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url))),
             view: null as any, // Will be set for non-home pages
             history: [],
             historyIndex: 0
@@ -291,7 +294,10 @@ export class TabManager {
             }
             tab.view = null as any;
             tab.url = url;
-            tab.title = url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : 'Downloads');
+            tab.title = url === 'neuralweb://home' ? 'Home' :
+                (url === 'neuralweb://settings' ? 'Settings' :
+                    (url === 'neuralweb://downloads' ? 'Downloads' :
+                        (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url)));
 
             // Notify renderer
             if (this.mainWindow) {

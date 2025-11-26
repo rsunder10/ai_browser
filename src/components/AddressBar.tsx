@@ -3,15 +3,17 @@ import { Lock, Star } from 'lucide-react';
 
 interface AddressBarProps {
     currentUrl: string;
+    pageTitle: string;
     onNavigate: (url: string) => void;
 }
 
-export default function AddressBar({ currentUrl, onNavigate }: AddressBarProps) {
+export default function AddressBar({ currentUrl, pageTitle, onNavigate }: AddressBarProps) {
     // Display friendly text for home page
     const displayUrl = currentUrl === 'neuralweb://home' ? 'Home' : currentUrl;
     const [inputValue, setInputValue] = useState(displayUrl);
     const [isSecure, setIsSecure] = useState(currentUrl.startsWith('https://'));
     const [isBookmarked, setIsBookmarked] = useState(false);
+    const [bookmarkId, setBookmarkId] = useState<string | null>(null);
 
     useEffect(() => {
         const display = currentUrl === 'neuralweb://home' ? 'Home' : currentUrl;
@@ -22,32 +24,43 @@ export default function AddressBar({ currentUrl, onNavigate }: AddressBarProps) 
 
     const checkBookmarkStatus = async () => {
         if (window.electron && currentUrl && currentUrl !== 'neuralweb://home') {
-            const status = await window.electron.invoke('bookmarks:check', currentUrl);
-            setIsBookmarked(status);
+            try {
+                const bookmark = await window.electron.invoke('bookmarks:getByUrl', currentUrl);
+                setIsBookmarked(!!bookmark);
+                setBookmarkId(bookmark ? bookmark.id : null);
+            } catch (e) {
+                console.error('Failed to check bookmark status:', e);
+                setIsBookmarked(false);
+                setBookmarkId(null);
+            }
         } else {
             setIsBookmarked(false);
+            setBookmarkId(null);
         }
     };
 
     const handleBookmarkClick = async () => {
         if (!window.electron || !currentUrl || currentUrl === 'neuralweb://home') return;
 
-        if (isBookmarked) {
-            // For now, we just remove by URL (this is a simplification, ideally we'd need the ID)
-            // But since our backend API is simple, let's assume we can't easily remove by URL yet without finding ID first
-            // For MVP, let's just implement ADDING. Removing requires finding the ID first.
-            // Let's implement a simple toggle if we can find the ID, otherwise just add.
-            // Actually, let's just implement ADD for now to keep it simple as per plan.
-            // Wait, the plan said "Add/Remove". Let's try to do it right.
-            // We need to find the bookmark ID to remove it.
-            // For this iteration, let's just support adding to keep it robust.
-            console.log('Already bookmarked');
-        } else {
-            await window.electron.invoke('bookmarks:add', {
-                title: document.title || inputValue, // We might not have access to page title here easily without more IPC
-                url: currentUrl
-            });
-            setIsBookmarked(true);
+        try {
+            if (isBookmarked && bookmarkId) {
+                await window.electron.invoke('bookmarks:remove', bookmarkId);
+                setIsBookmarked(false);
+                setBookmarkId(null);
+            } else {
+                const newBookmark = await window.electron.invoke('bookmarks:add', {
+                    title: pageTitle || inputValue,
+                    url: currentUrl
+                });
+                if (newBookmark) {
+                    setIsBookmarked(true);
+                    setBookmarkId(newBookmark.id);
+                } else {
+                    console.error('Failed to add bookmark: Backend returned null/undefined');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to toggle bookmark:', error);
         }
     };
 
@@ -75,7 +88,7 @@ export default function AddressBar({ currentUrl, onNavigate }: AddressBarProps) 
             />
             <button
                 className="bookmark-btn"
-                title={isBookmarked ? "Bookmarked" : "Bookmark this tab"}
+                title={isBookmarked ? "Remove bookmark" : "Bookmark this tab"}
                 onClick={handleBookmarkClick}
             >
                 <Star

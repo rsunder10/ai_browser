@@ -1,0 +1,97 @@
+.bookmarks-page {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    color: var(--text-primary);
+}
+
+.bookmarks-page .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.bookmarks-page h1 {
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.bookmarks-page .search-bar {
+    display: flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.bookmarks-page .search-bar input {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    margin-left: 0.5rem;
+    outline: none;
+    width: 200px;
+}
+
+.bookmark-item-row {
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    padding: 0.5rem;
+}
+
+.bookmark-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+.bookmark-info:hover {
+    background: var(--bg-hover);
+    border-radius: 4px;
+}
+
+.bookmark-info .icon {
+    color: var(--accent-color);
+}
+
+.bookmark-info .title {
+    font-weight: 500;
+}
+
+.bookmark-info .url {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    float: right;
+    margin-top: -2rem;
+    /* Hacky positioning */
+}
+
+.bookmark-item-row:hover .delete-btn {
+    opacity: 1;
+}
+
+.delete-btn:hover {
+    color: #ff4444;
+}
+
+.bookmark-children {
+    margin-left: 1.5rem;
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.5rem;
+    margin-top: 0.5rem;
+}

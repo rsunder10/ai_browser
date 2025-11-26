@@ -154,6 +154,10 @@ ipcMain.handle('bookmarks:check', async (event, url) => {
     return bookmarksManager.isBookmarked(url);
 });
 
+ipcMain.handle('bookmarks:getByUrl', async (event, url) => {
+    return bookmarksManager.getBookmarkByUrl(url);
+});
+
 // Downloads IPC
 ipcMain.handle('downloads:get-history', async () => {
     return downloadManager.getHistory();

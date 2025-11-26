@@ -17,6 +17,7 @@ declare global {
             invoke(channel: 'bookmarks:add', bookmark: any): Promise<any>;
             invoke(channel: 'bookmarks:remove', id: string): Promise<boolean>;
             invoke(channel: 'bookmarks:check', url: string): Promise<boolean>;
+            invoke(channel: 'bookmarks:getByUrl', url: string): Promise<any | null>;
             invoke(channel: 'settings:get'): Promise<any>;
             invoke(channel: 'settings:set', key: string, value: any): Promise<boolean>;
             invoke(channel: 'downloads:get-history'): Promise<any[]>;

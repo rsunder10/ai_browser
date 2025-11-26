@@ -4,7 +4,7 @@ import BrowserChrome from './components/BrowserChrome';
 import AISidebar from './components/AISidebar';
 import HomePage from './components/HomePage';
 import SettingsPage from './components/SettingsPage';
-
+import BookmarksPage from './components/BookmarksPage';
 import DownloadsPage from './components/DownloadsPage';
 
 interface Tab {
@@ -174,8 +174,9 @@ function App() {
   const isHomePage = currentUrl === 'neuralweb://home';
   const isSettingsPage = currentUrl === 'neuralweb://settings';
   const isDownloadsPage = currentUrl === 'neuralweb://downloads';
+  const isBookmarksPage = currentUrl === 'neuralweb://bookmarks';
 
-  console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage });
+  console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage });
 
   return (
     <div className="app">
@@ -195,7 +196,8 @@ function App() {
         {isHomePage && <HomePage onNavigate={handleNavigate} />}
         {isSettingsPage && <SettingsPage />}
         {isDownloadsPage && <DownloadsPage />}
-        {!isHomePage && !isSettingsPage && !isDownloadsPage && (
+        {isBookmarksPage && <BookmarksPage onNavigate={handleNavigate} />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>
