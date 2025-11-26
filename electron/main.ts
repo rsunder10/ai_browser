@@ -23,9 +23,17 @@ function createWindow() {
 
     // Load the React app
     if (process.env.NODE_ENV === 'development') {
-        mainWindow.loadURL('http://localhost:5174').catch((err) => {
-            console.error('Failed to load URL:', err);
-        });
+        const loadURLWithRetry = (url: string, retries = 5) => {
+            mainWindow?.loadURL(url).catch((err) => {
+                if (retries > 0) {
+                    console.log(`Failed to load URL, retrying... (${retries} attempts left)`);
+                    setTimeout(() => loadURLWithRetry(url, retries - 1), 1000);
+                } else {
+                    console.error('Failed to load URL:', err);
+                }
+            });
+        };
+        loadURLWithRetry('http://localhost:5173');
         // DevTools can be opened manually with Cmd+Option+I or View > Toggle Developer Tools
     } else {
         mainWindow.loadFile(path.join(__dirname, '../index.html'));
@@ -110,6 +118,10 @@ ipcMain.handle('get-active-tab', async () => {
 
 ipcMain.handle('open-devtools', async () => {
     tabManager.openDevToolsForActiveTab();
+});
+
+ipcMain.handle('get-top-sites', async () => {
+    return tabManager.getTopSites();
 });
 
 // App lifecycle

@@ -47,6 +47,8 @@ body {
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
+  align-items: center;
+  scrollbar-width: none;
 }
 
 .tabs-container::-webkit-scrollbar {
@@ -112,6 +114,11 @@ body {
   padding: 4px 12px;
   border-radius: 4px;
   transition: background 0.2s;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
 }
 
 .new-tab-btn:hover {

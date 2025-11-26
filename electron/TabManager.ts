@@ -39,7 +39,19 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
+                this.trackVisit(tab.url, undefined, title);
                 this.log('Title updated:', title, 'for tab:', tabId);
+            }
+        });
+
+        // Favicon updates
+        view.webContents.on('page-favicon-updated', (_event, favicons) => {
+            const tab = this.tabs.get(tabId);
+            if (tab && favicons && favicons.length > 0) {
+                // Prefer high-res icons if available, but for now just take the first one
+                const favicon = favicons[0];
+                this.trackVisit(tab.url, favicon);
+                this.log('Favicon updated:', favicon, 'for tab:', tabId);
             }
         });
 
@@ -51,6 +63,7 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
+                this.trackVisit(url);
                 this.log('Navigated to:', url);
             }
         });
@@ -63,6 +76,7 @@ export class TabManager {
                 if (this.mainWindow) {
                     this.mainWindow.webContents.send('tab-updated', tabId);
                 }
+                this.trackVisit(url);
             }
         });
 
@@ -363,6 +377,50 @@ export class TabManager {
 
     getActiveTabId(): string | null {
         return this.activeTabId;
+    }
+
+    private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
+
+    private trackVisit(url: string, favicon?: string, title?: string) {
+        if (!url || url.startsWith('neuralweb://') || url === 'about:blank') return;
+
+        try {
+            const domain = new URL(url).origin;
+            const current = this.visitCounts.get(domain) || { count: 0 };
+
+            this.visitCounts.set(domain, {
+                count: current.count + 1,
+                favicon: favicon || current.favicon,
+                title: title || current.title
+            });
+
+            this.log('Tracked visit for:', domain, 'Count:', current.count + 1);
+        } catch (e) {
+            // Ignore invalid URLs
+        }
+    }
+
+    getTopSites(): Array<{ name: string; url: string; icon: string; color: string; favicon?: string }> {
+        const sortedSites = Array.from(this.visitCounts.entries())
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 8)
+            .map(([domain, data]) => {
+                let name = domain.replace(/^https?:\/\/(www\.)?/, '');
+                name = name.charAt(0).toUpperCase() + name.slice(1);
+
+                // Use Google's favicon service as fallback if no local favicon
+                const fallbackFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+
+                return {
+                    name: data.title || name,
+                    url: domain,
+                    icon: '🌐', // Fallback emoji
+                    color: '#333333',
+                    favicon: data.favicon || fallbackFavicon
+                };
+            });
+
+        return sortedSites;
     }
 
     repositionViews(mainWindow: BrowserWindow): void {

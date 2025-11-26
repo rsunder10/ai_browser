@@ -56,10 +56,21 @@ function App() {
 
     window.electron.on('tab-updated', handleTabUpdate);
 
+    // Keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault();
+        handleNewTab();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       if (window.electron) {
         window.electron.removeListener('tab-updated', handleTabUpdate);
       }
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 

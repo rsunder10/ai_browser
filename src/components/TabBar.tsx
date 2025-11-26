@@ -36,10 +36,10 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                         </button>
                     </div>
                 ))}
+                <button className="new-tab-btn" onClick={onNewTab} title="New Tab">
+                    +
+                </button>
             </div>
-            <button className="new-tab-btn" onClick={onNewTab} title="New Tab">
-                +
-            </button>
         </div>
     );
 }
