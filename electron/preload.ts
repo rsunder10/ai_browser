@@ -49,6 +49,9 @@ contextBridge.exposeInMainWorld('electron', {
             'zoom:get',
             'zoom:reset',
             'print:page',
+            'ai_query',
+            'passwords:list',
+            'session:clear',
         ];
 
         if (validChannels.includes(channel)) {

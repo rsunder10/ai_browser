@@ -2,48 +2,45 @@
 
 Based on a comprehensive review of the codebase, the following features are recommended to enhance the browser's functionality and user experience.
 
-## Essential Features
-These features are considered standard for any modern web browser and are currently missing or incomplete.
+## Completed / Implemented Features
+- [x] **Global History**: `HistoryPage` and backend logic implemented.
+- [x] **Find in Page**: UI and IPC handlers implemented.
+- [x] **Zoom Controls**: Menu and shortcuts implemented.
+- [x] **Print Support**: Basic print functionality implemented.
+- [x] **Site Settings**: Permissions management implemented.
+- [x] **Custom Search Engines**: Configurable in Settings.
+- [x] **Incognito Mode**: implemented.
 
-### 1. Global History
-- **Current State**: The browser tracks navigation within a tab for Back/Forward functionality and keeps an in-memory count of top sites. There is no persistent global history.
-- **Recommendation**: Implement a persistent history database (e.g., using SQLite or JSON file) and a `HistoryPage` UI to view, search, and clear browsing history.
+## In Progress / Partial
+- [ ] **Extensions Support**:
+    - **Current State**: Developer mode (loading unpacked extensions) is implemented.
+    - **Next Steps**: Support for CRX files or Chrome Web Store integration (complex).
+- [ ] **Password Manager**:
+    - **Current State**: Backend logic exists. Basic UI in Settings.
+    - **Next Steps**: Improve UI, add auto-fill integration, secure storage integration.
 
-### 2. Find in Page
-- **Current State**: No functionality to search for text within a web page.
-- **Recommendation**: Add `Cmd+F` (or `Ctrl+F`) support to open a search bar. Use Electron's `webContents.findInPage` API to highlight and navigate matches.
+## New Suggestions (Next Steps)
 
-### 3. Zoom Controls
-- **Current State**: No UI or keyboard shortcuts for zooming.
-- **Recommendation**: Implement `Cmd/Ctrl +` and `Cmd/Ctrl -` shortcuts and a menu option to control page zoom levels using `webContents.setZoomLevel`.
+### 1. AI Assistant Backend (Critical Fix)
+- **Current State**: `AISidebar` UI exists but the `ai_query` IPC handler is missing in `main.ts`.
+- **Recommendation**: Implement a local AI handler (mock or simple heuristic) to make the sidebar functional.
 
-### 4. Print Support
-- **Current State**: No print functionality.
-- **Recommendation**: Add `Cmd/Ctrl + P` support and a menu option to trigger printing using `webContents.print`.
+### 2. Reader Mode
+- **Current State**: Not implemented.
+- **Recommendation**: Add a "Reader View" that strips clutter (ads, navigation) and presents clean text. This fits the "Neural/AI" theme.
 
-## Advanced Features
-These features would significantly improve the browser's capability and competitiveness.
+### 3. Tab Groups
+- **Current State**: Basic tabs only.
+- **Recommendation**: Allow users to group tabs by context (e.g., "Work", "Research").
 
-### 5. Extensions Support
-- **Current State**: No support for Chrome extensions.
-- **Recommendation**: Implement support for loading Chrome extensions. This is a complex task involving Electron's `session.loadExtension` and handling extension APIs.
+### 4. Ad Blocker
+- **Current State**: No blocking.
+- **Recommendation**: Implement basic request filtering using Electron's `webRequest` API.
 
-### 6. Password Manager
-- **Current State**: No password saving or autofill.
-- **Recommendation**: Implement a secure password manager to save and autofill credentials. This requires secure storage (e.g., system keychain) and IPC handlers for form detection.
-
-### 7. Site Settings & Permissions
-- **Current State**: No granular control over site permissions (camera, microphone, notifications, location).
-- **Recommendation**: Add a UI to manage permissions per site. Listen to `session.setPermissionRequestHandler` to prompt users.
-
-### 8. Custom Search Engines
-- **Current State**: Search engine is likely hardcoded or defaults to Google.
-- **Recommendation**: Allow users to configure their default search engine (Google, Bing, DuckDuckGo, etc.) in the Settings page.
-
-### 9. Incognito Mode Improvements
-- **Current State**: Basic backend support exists (`create-incognito-window`), but visual indicators might be subtle.
-- **Recommendation**: Ensure a distinct visual theme (e.g., dark theme or specific icon) for Incognito windows to clearly differentiate them from normal windows.
+### 5. Session Restore Polish
+- **Current State**: Basic restore exists.
+- **Recommendation**: Ensure scroll position and history state are preserved per tab.
 
 ## Technical Improvements
-- **Session Restore**: Automatically restore tabs and windows after a crash or restart.
 - **Crash Handling**: Better error pages for renderer crashes.
+- **Performance**: Optimize BrowserView resizing and switching.

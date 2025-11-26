@@ -11,6 +11,7 @@ import { ExtensionsManager } from './managers/ExtensionsManager';
 import { PasswordManager } from './managers/PasswordManager';
 import { PermissionsManager } from './managers/PermissionsManager';
 import { SessionManager } from './managers/SessionManager';
+import { AIManager } from './managers/AIManager';
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
@@ -24,6 +25,7 @@ const extensionsManager = new ExtensionsManager();
 const passwordManager = new PasswordManager();
 const permissionsManager = new PermissionsManager();
 const sessionManager = new SessionManager();
+const aiManager = new AIManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -574,3 +576,10 @@ ipcMain.handle('permissions:clear', async (event, origin) => {
     permissionsManager.clearPermissionsForOrigin(origin);
     return true;
 });
+
+// AI IPC
+ipcMain.handle('ai_query', async (event, { provider, prompt }) => {
+    return aiManager.processQuery(provider, prompt);
+});
+
+
