@@ -4,19 +4,13 @@ import { TabManager } from './TabManager';
 
 import { BookmarksManager } from './managers/BookmarksManager';
 import { SettingsManager } from './managers/SettingsManager';
+import { DownloadManager } from './managers/DownloadManager';
 
 let mainWindow: BrowserWindow | null = null;
 const tabManager = new TabManager();
 const bookmarksManager = new BookmarksManager();
 const settingsManager = new SettingsManager();
-
-// ... (createWindow function remains the same)
-
-// IPC Handlers
-// ... (existing handlers)
-
-// Bookmarks IPC
-// IPC Handlers moved to bottom
+const downloadManager = new DownloadManager();
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -31,8 +25,14 @@ function createWindow() {
         },
     });
 
-    // Set main window reference in TabManager
+    // Set main window reference in managers
     tabManager.setMainWindow(mainWindow);
+    downloadManager.setMainWindow(mainWindow);
+
+    // Handle downloads
+    mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
+        downloadManager.handleWillDownload(event, item, webContents);
+    });
 
     // Load the React app
     if (process.env.NODE_ENV === 'development') {
@@ -152,6 +152,31 @@ ipcMain.handle('bookmarks:remove', async (event, id) => {
 
 ipcMain.handle('bookmarks:check', async (event, url) => {
     return bookmarksManager.isBookmarked(url);
+});
+
+// Downloads IPC
+ipcMain.handle('downloads:get-history', async () => {
+    return downloadManager.getHistory();
+});
+
+ipcMain.handle('downloads:pause', async (event, id) => {
+    downloadManager.pause(id);
+});
+
+ipcMain.handle('downloads:resume', async (event, id) => {
+    downloadManager.resume(id);
+});
+
+ipcMain.handle('downloads:cancel', async (event, id) => {
+    downloadManager.cancel(id);
+});
+
+ipcMain.handle('downloads:open-file', async (event, id) => {
+    downloadManager.openFile(id);
+});
+
+ipcMain.handle('downloads:clear', async () => {
+    downloadManager.clearHistory();
 });
 
 // Settings IPC

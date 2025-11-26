@@ -3,7 +3,7 @@ import TabBar from './TabBar';
 import NavigationControls from './NavigationControls';
 import AddressBar from './AddressBar';
 import BookmarksBar from './BookmarksBar';
-import { Settings } from 'lucide-react';
+import { Settings, Download } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -66,6 +66,13 @@ export default function BrowserChrome({
                     currentUrl={currentUrl}
                     onNavigate={onNavigate}
                 />
+                <button
+                    className="settings-btn"
+                    onClick={() => onNavigate('neuralweb://downloads')}
+                    title="Downloads"
+                >
+                    <Download size={18} />
+                </button>
                 <button
                     className="settings-btn"
                     onClick={() => onNavigate('neuralweb://settings')}

@@ -166,7 +166,7 @@ export class TabManager {
         const tabInfo: Tab = {
             id: tabId,
             url: url,
-            title: url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : url),
+            title: url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : (url === 'neuralweb://downloads' ? 'Downloads' : url)),
             view: null as any, // Will be set for non-home pages
             history: [],
             historyIndex: 0
@@ -291,7 +291,7 @@ export class TabManager {
             }
             tab.view = null as any;
             tab.url = url;
-            tab.title = url === 'neuralweb://home' ? 'Home' : 'Settings'; // Simple title logic for now
+            tab.title = url === 'neuralweb://home' ? 'Home' : (url === 'neuralweb://settings' ? 'Settings' : 'Downloads');
 
             // Notify renderer
             if (this.mainWindow) {
@@ -441,7 +441,7 @@ export class TabManager {
     repositionViews(mainWindow: BrowserWindow): void {
         const bounds = mainWindow.getContentBounds();
         this.tabs.forEach((tab) => {
-            if (tab.id === this.activeTabId) {
+            if (tab.id === this.activeTabId && tab.view) {
                 tab.view.setBounds({
                     x: 0,
                     y: this.CHROME_HEIGHT,

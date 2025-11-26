@@ -19,6 +19,12 @@ declare global {
             invoke(channel: 'bookmarks:check', url: string): Promise<boolean>;
             invoke(channel: 'settings:get'): Promise<any>;
             invoke(channel: 'settings:set', key: string, value: any): Promise<boolean>;
+            invoke(channel: 'downloads:get-history'): Promise<any[]>;
+            invoke(channel: 'downloads:pause', id: string): Promise<void>;
+            invoke(channel: 'downloads:resume', id: string): Promise<void>;
+            invoke(channel: 'downloads:cancel', id: string): Promise<void>;
+            invoke(channel: 'downloads:open-file', id: string): Promise<void>;
+            invoke(channel: 'downloads:clear'): Promise<void>;
             // invoke: (channel: string, ...args: any[]) => Promise<any>;
             on: (channel: string, callback: (...args: any[]) => void) => void;
             removeListener: (channel: string, callback: (...args: any[]) => void) => void;

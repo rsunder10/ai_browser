@@ -5,6 +5,8 @@ import AISidebar from './components/AISidebar';
 import HomePage from './components/HomePage';
 import SettingsPage from './components/SettingsPage';
 
+import DownloadsPage from './components/DownloadsPage';
+
 interface Tab {
   id: string;
   url: string;
@@ -166,8 +168,14 @@ function App() {
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const currentUrl = activeTab?.url || '';
+
+  // ...
+
   const isHomePage = currentUrl === 'neuralweb://home';
   const isSettingsPage = currentUrl === 'neuralweb://settings';
+  const isDownloadsPage = currentUrl === 'neuralweb://downloads';
+
+  console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage });
 
   return (
     <div className="app">
@@ -186,7 +194,8 @@ function App() {
       <div className="content-area">
         {isHomePage && <HomePage onNavigate={handleNavigate} />}
         {isSettingsPage && <SettingsPage />}
-        {!isHomePage && !isSettingsPage && (
+        {isDownloadsPage && <DownloadsPage />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>
