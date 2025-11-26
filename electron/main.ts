@@ -1,4 +1,5 @@
-import { app, BrowserWindow, BrowserView, ipcMain } from 'electron';
+
+import { app, BrowserWindow, BrowserView, ipcMain, Menu } from 'electron';
 import * as path from 'path';
 import { TabManager } from './TabManager';
 
@@ -6,14 +7,24 @@ import { BookmarksManager } from './managers/BookmarksManager';
 import { SettingsManager } from './managers/SettingsManager';
 import { DownloadManager } from './managers/DownloadManager';
 
-let mainWindow: BrowserWindow | null = null;
-const tabManager = new TabManager();
+// Manage multiple windows and their respective TabManagers
+const windows = new Map<number, BrowserWindow>();
+const tabManagers = new Map<number, TabManager>();
+
 const bookmarksManager = new BookmarksManager();
 const settingsManager = new SettingsManager();
 const downloadManager = new DownloadManager();
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
+function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return null;
+    return tabManagers.get(window.id) || null;
+}
+
+function createWindow(options: { incognito?: boolean } = {}) {
+    const { incognito = false } = options;
+
+    const window = new BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
@@ -22,22 +33,30 @@ function createWindow() {
             nodeIntegration: false,
             sandbox: false, // Disable sandbox to prevent V8 crashes on macOS
             webSecurity: true,
+            partition: incognito ? 'incognito' : 'persist:main',
         },
     });
 
-    // Set main window reference in managers
-    tabManager.setMainWindow(mainWindow);
-    downloadManager.setMainWindow(mainWindow);
+    const windowId = window.id;
+    windows.set(windowId, window);
 
-    // Handle downloads
-    mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
+    // Create a new TabManager for this window
+    const tabManager = new TabManager();
+    tabManager.setMainWindow(window);
+    tabManagers.set(windowId, tabManager);
+
+    // Update download manager to track this window (simplified for now, might need better multi-window handling)
+    downloadManager.setMainWindow(window);
+
+    // Handle downloads for this window's session
+    window.webContents.session.on('will-download', (event, item, webContents) => {
         downloadManager.handleWillDownload(event, item, webContents);
     });
 
     // Load the React app
     if (process.env.NODE_ENV === 'development') {
         const loadURLWithRetry = (url: string, retries = 5) => {
-            mainWindow?.loadURL(url).catch((err) => {
+            window.loadURL(url).catch((err) => {
                 if (retries > 0) {
                     console.log(`Failed to load URL, retrying... (${retries} attempts left)`);
                     setTimeout(() => loadURLWithRetry(url, retries - 1), 1000);
@@ -47,17 +66,17 @@ function createWindow() {
             });
         };
         loadURLWithRetry('http://localhost:5173');
-        // DevTools can be opened manually with Cmd+Option+I or View > Toggle Developer Tools
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../index.html'));
+        window.loadFile(path.join(__dirname, '../index.html'));
     }
 
-    mainWindow.on('closed', () => {
-        mainWindow = null;
+    window.on('closed', () => {
+        windows.delete(windowId);
+        tabManagers.delete(windowId);
     });
 
     // Add keyboard shortcut to open DevTools in detached mode
-    mainWindow.webContents.on('before-input-event', (event, input) => {
+    window.webContents.on('before-input-event', (event, input) => {
         // Cmd+Option+I on Mac, Ctrl+Shift+I on Windows/Linux
         if ((input.meta && input.alt && input.key.toLowerCase() === 'i') ||
             (input.control && input.shift && input.key.toLowerCase() === 'i')) {
@@ -67,74 +86,125 @@ function createWindow() {
             const activeTabId = tabManager.getActiveTabId();
             if (activeTabId) {
                 tabManager.openDevToolsForActiveTab();
-            } else if (mainWindow) {
+            } else {
                 // Fallback to main window DevTools (for React UI)
-                mainWindow.webContents.openDevTools({ mode: 'detach' });
+                window.webContents.openDevTools({ mode: 'detach' });
             }
         }
     });
 
     // Handle window resize to reposition BrowserViews
-    mainWindow.on('resize', () => {
-        if (mainWindow) {
-            tabManager.repositionViews(mainWindow);
-        }
+    window.on('resize', () => {
+        tabManager.repositionViews(window);
     });
 
     // Handle window move to reposition BrowserViews
-    mainWindow.on('move', () => {
-        if (mainWindow) {
-            tabManager.repositionViews(mainWindow);
-        }
+    window.on('move', () => {
+        tabManager.repositionViews(window);
     });
 }
 
 // IPC Handlers
 ipcMain.handle('create-tab', async (event, url: string) => {
-    if (!mainWindow) return null;
-    return tabManager.createTab(mainWindow, url);
+    const tm = getTabManager(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!tm || !win) return null;
+    return tm.createTab(win, url);
 });
 
 ipcMain.handle('close-tab', async (event, tabId: string) => {
-    if (!mainWindow) return;
-    tabManager.closeTab(mainWindow, tabId);
+    const tm = getTabManager(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!tm || !win) return;
+    tm.closeTab(win, tabId);
 });
 
 ipcMain.handle('switch-tab', async (event, tabId: string) => {
-    if (!mainWindow) return;
-    tabManager.switchTab(mainWindow, tabId);
+    const tm = getTabManager(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!tm || !win) return;
+    tm.switchTab(win, tabId);
 });
 
 ipcMain.handle('navigate-tab', async (event, tabId: string, url: string) => {
-    tabManager.navigateTab(tabId, url);
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.navigateTab(tabId, url);
 });
 
 ipcMain.handle('go-back', async (event, tabId: string) => {
-    tabManager.goBack(tabId);
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.goBack(tabId);
 });
 
 ipcMain.handle('go-forward', async (event, tabId: string) => {
-    tabManager.goForward(tabId);
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.goForward(tabId);
 });
 
 ipcMain.handle('refresh-tab', async (event, tabId: string) => {
-    tabManager.refreshTab(tabId);
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.refreshTab(tabId);
 });
 
-ipcMain.handle('get-tabs', async () => {
-    return tabManager.getTabs();
+ipcMain.handle('get-tabs', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return [];
+    return tm.getTabs();
 });
 
-ipcMain.handle('get-active-tab', async () => {
-    return tabManager.getActiveTabId();
+ipcMain.handle('get-active-tab', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return null;
+    return tm.getActiveTabId();
 });
 
-ipcMain.handle('open-devtools', async () => {
-    tabManager.openDevToolsForActiveTab();
+ipcMain.handle('open-devtools', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.openDevToolsForActiveTab();
 });
 
-ipcMain.handle('get-top-sites', async () => {
-    return tabManager.getTopSites();
+ipcMain.handle('get-top-sites', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return [];
+    return tm.getTopSites();
+});
+
+ipcMain.handle('create-incognito-window', async () => {
+    createWindow({ incognito: true });
+});
+
+ipcMain.handle('open-browser-menu', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+
+    const menu = Menu.buildFromTemplate([
+        {
+            label: 'New Incognito Window',
+            click: () => {
+                createWindow({ incognito: true });
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Settings',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://settings');
+                    }
+                }
+            }
+        }
+    ]);
+
+    menu.popup({ window: win });
 });
 
 // Bookmarks IPC
@@ -195,7 +265,7 @@ ipcMain.handle('settings:set', async (event, key, value) => {
 });
 
 // App lifecycle
-app.whenReady().then(createWindow);
+app.whenReady().then(() => createWindow());
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
@@ -204,7 +274,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (windows.size === 0) {
         createWindow();
     }
 });
