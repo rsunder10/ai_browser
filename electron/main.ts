@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, BrowserView, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, BrowserView, ipcMain, Menu, dialog } from 'electron';
 import * as path from 'path';
 import { TabManager } from './TabManager';
 
@@ -10,6 +10,7 @@ import { HistoryManager } from './managers/HistoryManager';
 import { ExtensionsManager } from './managers/ExtensionsManager';
 import { PasswordManager } from './managers/PasswordManager';
 import { PermissionsManager } from './managers/PermissionsManager';
+import { SessionManager } from './managers/SessionManager';
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
@@ -22,6 +23,7 @@ const historyManager = new HistoryManager();
 const extensionsManager = new ExtensionsManager();
 const passwordManager = new PasswordManager();
 const permissionsManager = new PermissionsManager();
+const sessionManager = new SessionManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -29,8 +31,8 @@ function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     return tabManagers.get(window.id) || null;
 }
 
-function createWindow(options: { incognito?: boolean } = {}) {
-    const { incognito = false } = options;
+function createWindow(options: { incognito?: boolean, initialTabs?: { url: string, title: string }[] } = {}) {
+    const { incognito = false, initialTabs = [] } = options;
 
     const window = new BrowserWindow({
         width: 1200,
@@ -49,7 +51,7 @@ function createWindow(options: { incognito?: boolean } = {}) {
     windows.set(windowId, window);
 
     // Create a new TabManager for this window
-    const tabManager = new TabManager(historyManager);
+    const tabManager = new TabManager(historyManager, sessionManager);
     tabManager.setMainWindow(window);
     tabManagers.set(windowId, tabManager);
 
@@ -97,6 +99,45 @@ function createWindow(options: { incognito?: boolean } = {}) {
     } else {
         window.loadFile(path.join(__dirname, '../index.html'));
     }
+
+    // Restore tabs or create default
+    window.webContents.once('did-finish-load', async () => {
+        if (initialTabs.length > 0) {
+            for (const tab of initialTabs) {
+                await tabManager.createTab(window, tab.url);
+            }
+        } else {
+            // Default tab
+            // Only create if no tabs exist (to avoid duplicates if something else created one)
+            if (tabManager.getTabs().length === 0) {
+                await tabManager.createTab(window, 'neuralweb://home');
+            }
+        }
+    });
+
+    window.on('close', (e) => {
+        const choice = dialog.showMessageBoxSync(window, {
+            type: 'question',
+            buttons: ['Yes', 'No', 'Cancel'],
+            title: 'Save Session?',
+            message: 'Do you want to save your session?',
+            detail: 'If you select "No", your tabs will be cleared.',
+            defaultId: 0,
+            cancelId: 2
+        });
+
+        if (choice === 2) {
+            // Cancel
+            e.preventDefault();
+        } else if (choice === 1) {
+            // No - Clear session
+            sessionManager.removeWindow(windowId);
+            // Allow close to proceed
+        } else {
+            // Yes - Session is already saved by SessionManager updates
+            // Allow close to proceed
+        }
+    });
 
     window.on('closed', () => {
         windows.delete(windowId);
@@ -474,7 +515,25 @@ ipcMain.handle('print:page', async (event) => {
 });
 
 // App lifecycle
-app.whenReady().then(() => createWindow());
+app.whenReady().then(() => {
+    const lastSession = sessionManager.getLastSession();
+    const windowIds = Object.keys(lastSession.windows).map(Number);
+
+    if (windowIds.length > 0) {
+        // Restore windows
+        for (const winId of windowIds) {
+            const winState = lastSession.windows[winId];
+            createWindow({ initialTabs: winState.tabs });
+        }
+    } else {
+        createWindow();
+    }
+});
+
+ipcMain.handle('session:clear', async () => {
+    sessionManager.clearSession();
+    return true;
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {

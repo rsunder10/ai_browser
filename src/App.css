@@ -65,6 +65,59 @@ body {
   opacity: 0.8;
 }
 
+/* Global Incognito Styles */
+.app.incognito {
+  --bg-primary: #202124;
+  --bg-secondary: #292a2d;
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --border-color: #3c4043;
+}
+
+.app.incognito .settings-page,
+.app.incognito .downloads-page,
+.app.incognito .history-page,
+.app.incognito .bookmarks-page,
+.app.incognito .extensions-page,
+.app.incognito .site-settings-page {
+  background-color: #202124;
+  color: #e8eaed;
+}
+
+.app.incognito .settings-sidebar,
+.app.incognito .downloads-list,
+.app.incognito .history-list,
+.app.incognito .bookmarks-list {
+  background-color: #292a2d;
+  border-color: #3c4043;
+}
+
+.app.incognito .settings-section,
+.app.incognito .download-item,
+.app.incognito .history-item,
+.app.incognito .bookmark-item-row {
+  background-color: #292a2d;
+  border-color: #3c4043;
+}
+
+.app.incognito .settings-header h1,
+.app.incognito .downloads-header h1,
+.app.incognito .history-header h1 {
+  color: #e8eaed;
+}
+
+.app.incognito .settings-nav a:hover {
+  background-color: #3c4043;
+  color: #e8eaed;
+}
+
+.app.incognito .setting-item select,
+.app.incognito .setting-item input {
+  background-color: #3c4043;
+  color: #e8eaed;
+  border-color: #5f6368;
+}
+
 /* Browser Chrome */
 .browser-chrome {
   background: #dfe1e5;

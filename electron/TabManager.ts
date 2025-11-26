@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { SettingsManager } from './managers/SettingsManager';
 import { HistoryManager } from './managers/HistoryManager';
+import { PasswordManager } from './managers/PasswordManager';
+import { SessionManager } from './managers/SessionManager';
 
 interface Tab {
     id: string;
@@ -20,13 +22,18 @@ export class TabManager {
     private mainWindow: BrowserWindow | null = null;
     private settingsManager: SettingsManager;
     private historyManager: HistoryManager;
+    private passwordManager: PasswordManager;
+    private sessionManager: SessionManager;
     private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
     private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
+    private readonly isIncognito = false; // TODO: Implement incognito mode
 
-    constructor(historyManager: HistoryManager) {
+    constructor(historyManager: HistoryManager, sessionManager: SessionManager) {
         this.settingsManager = new SettingsManager();
         this.historyManager = historyManager;
+        this.passwordManager = new PasswordManager();
+        this.sessionManager = sessionManager;
     }
 
     setMainWindow(window: BrowserWindow) {
@@ -40,6 +47,26 @@ export class TabManager {
         if (this.isDevelopment) {
             console.log('[TabManager]', ...args);
         }
+    }
+
+    private saveSession() {
+        if (!this.mainWindow || this.isIncognito) return;
+
+        const tabsList = this.getTabs().map(t => ({
+            url: t.url,
+            title: t.title
+        }));
+
+        // Assuming tabOrder is managed elsewhere or we need to derive it
+        // For now, let's just save the active tab ID and the list of tabs
+        // A more robust solution would involve tracking the order of tabs in an array.
+        // For simplicity, let's assume the order in getTabs() is sufficient for now.
+        const activeIndex = tabsList.findIndex(t => {
+            const activeTab = this.tabs.get(this.activeTabId || '');
+            return activeTab && t.url === activeTab.url && t.title === activeTab.title;
+        });
+
+        this.sessionManager.updateWindow(this.mainWindow.id, tabsList, activeIndex);
     }
 
     private setupBrowserView(view: BrowserView, tabId: string): void {
@@ -182,6 +209,7 @@ export class TabManager {
         if (url.startsWith('neuralweb://')) {
             this.tabs.set(tabId, tabInfo);
             this.switchTab(mainWindow, tabId);
+            this.saveSession();
             return tabId;
         }
 
@@ -228,6 +256,7 @@ export class TabManager {
 
         // Set as active and hide others
         this.switchTab(mainWindow, tabId);
+        this.saveSession();
 
         return tabId;
     }
@@ -254,6 +283,7 @@ export class TabManager {
                 this.activeTabId = null;
             }
         }
+        this.saveSession();
     }
 
     switchTab(mainWindow: BrowserWindow, tabId: string): void {
@@ -282,6 +312,7 @@ export class TabManager {
         }
 
         this.activeTabId = tabId;
+        this.saveSession();
     }
 
     navigateTab(tabId: string, url: string) {
@@ -304,8 +335,9 @@ export class TabManager {
 
             // Notify renderer
             if (this.mainWindow) {
-                this.mainWindow.webContents.send('tab-updated', tabId);
+                this.mainWindow.webContents.send('tab-updated', this.activeTabId);
             }
+            this.saveSession();
             return;
         }
 
@@ -342,6 +374,7 @@ export class TabManager {
             tab.view.webContents.loadURL(urlString);
             tab.url = urlString;
         }
+        this.saveSession();
     }
 
     openDevToolsForActiveTab(): void {
@@ -424,6 +457,7 @@ export class TabManager {
                 url: url,
                 title: url, // Initial title is URL
             });
+            this.saveSession();
         } catch (e) {
             // Invalid URL, ignore
         }
@@ -446,6 +480,7 @@ export class TabManager {
 
             // Update global history
             this.historyManager.updateLastEntry(url, metadata);
+            this.saveSession();
         } catch (e) {
             // Invalid URL, ignore
         }

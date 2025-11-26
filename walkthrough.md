@@ -50,3 +50,13 @@ This walkthrough guides you through verifying the newly implemented features: Gl
     -   Press `Cmd+P` (Mac) / `Ctrl+P` (Windows).
     -   OR click **Menu** -> **Print**.
 2.  **Verify**: Ensure the system print dialog appears.
+
+## 5. Tailwind CSS Configuration Fix
+
+### Verification Steps
+1.  **VS Code Settings**:
+    -   Verify that `.vscode/settings.json` exists and contains `"css.lint.unknownAtRules": "ignore"`.
+    -   Verify that the "Unknown at rule @tailwind" warning in `src/App.css` is gone (or will be gone after reloading the window).
+2.  **Build Check**:
+    -   Run `npm run build` in the terminal.
+    -   Verify that the build completes successfully without errors, confirming that Tailwind is correctly configured.

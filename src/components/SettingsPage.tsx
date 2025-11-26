@@ -90,6 +90,24 @@ export default function SettingsPage() {
                             placeholder="neuralweb://home"
                         />
                     </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Clear Session</label>
+                            <p>Reset saved windows and tabs on next startup</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={async () => {
+                                if (window.electron) {
+                                    await window.electron.invoke('session:clear');
+                                    alert('Session cleared. Changes will take effect on next restart.');
+                                }
+                            }}
+                            style={{ marginTop: '8px', padding: '8px 16px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                            Clear Session
+                        </button>
+                    </div>
                 </section>
 
                 <section id="privacy" className="settings-section">

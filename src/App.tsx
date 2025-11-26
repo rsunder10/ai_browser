@@ -23,6 +23,7 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [showFindInPage, setShowFindInPage] = useState(false);
+  const [isIncognito, setIsIncognito] = useState(false);
   const initialized = useRef(false);
 
   // Load tabs on mount
@@ -41,6 +42,9 @@ function App() {
 
     // Load tabs and create initial tab if none exist
     const initializeTabs = async () => {
+      const incognito = await window.electron.invoke('is-incognito');
+      setIsIncognito(incognito);
+
       await loadTabs();
       const result = await window.electron.invoke('get-tabs');
       if (result.length === 0) {
@@ -163,10 +167,57 @@ function App() {
     }
   };
 
-  const handleNavigate = async (url: string) => {
+  const isValidUrl = (string: string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const getSearchUrl = async (query: string) => {
+    try {
+      const settings = await window.electron.invoke('settings:get');
+      const engine = settings?.searchEngine || 'google';
+
+      switch (engine) {
+        case 'bing':
+          return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+        case 'duckduckgo':
+          return `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+        case 'google':
+        default:
+          return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      }
+    } catch (error) {
+      console.error('Failed to get settings:', error);
+      return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    }
+  };
+
+  const handleNavigate = async (input: string) => {
     if (!activeTabId) {
       console.error('No active tab ID!');
       return;
+    }
+
+    let url = input;
+    // Handle internal pages
+    if (input.startsWith('neuralweb://')) {
+      url = input;
+    }
+    // Handle valid URLs (including localhost)
+    else if (isValidUrl(input)) {
+      url = input;
+    }
+    // Handle incomplete URLs (e.g. google.com)
+    else if (input.includes('.') && !input.includes(' ')) {
+      url = `https://${input}`;
+    }
+    // Handle search queries
+    else {
+      url = await getSearchUrl(input);
     }
 
     try {
@@ -228,7 +279,7 @@ function App() {
   console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage, isHistoryPage });
 
   return (
-    <div className="app">
+    <div className={`app ${isIncognito ? 'incognito' : ''}`}>
       <BrowserChrome
         tabs={tabs}
         activeTabId={activeTabId}
