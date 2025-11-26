@@ -99,4 +99,15 @@ export class PasswordManager {
     getAllPasswords(): SavedPassword[] {
         return this.passwords;
     }
+
+    deletePassword(id: string): boolean {
+        const initialLength = this.passwords.length;
+        this.passwords = this.passwords.filter(p => p.id !== id);
+
+        if (this.passwords.length !== initialLength) {
+            this.savePasswords();
+            return true;
+        }
+        return false;
+    }
 }

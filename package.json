@@ -51,7 +51,10 @@
             "package.json"
         ],
         "mac": {
-            "category": "public.app-category.productivity"
+            "category": "public.app-category.productivity",
+            "extendInfo": {
+                "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to devices."
+            }
         },
         "win": {
             "target": "nsis"

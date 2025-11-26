@@ -564,6 +564,10 @@ ipcMain.handle('passwords:list', async () => {
     return passwordManager.getAllPasswords();
 });
 
+ipcMain.handle('passwords:delete', async (event, id) => {
+    return passwordManager.deletePassword(id);
+});
+
 // Permissions IPC
 ipcMain.handle('permissions:get-all', async () => {
     return permissionsManager.getAllPermissions();

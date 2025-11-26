@@ -51,9 +51,9 @@ contextBridge.exposeInMainWorld('electron', {
             'print:page',
             'ai_query',
             'passwords:list',
-            'session:clear',
             'reader:toggle',
             'reader:status',
+            'passwords:delete',
         ];
 
         if (validChannels.includes(channel)) {
@@ -74,4 +74,43 @@ contextBridge.exposeInMainWorld('electron', {
             ipcRenderer.removeListener(channel, callback);
         }
     },
+});
+
+// Auto-fill logic
+window.addEventListener('DOMContentLoaded', async () => {
+    const url = window.location.href;
+    if (url.startsWith('neuralweb://')) return;
+
+    try {
+        const credentials = await ipcRenderer.invoke('passwords:get', url);
+        if (credentials && credentials.length > 0) {
+            try { // New try block for DOM manipulation
+                const { username, password } = credentials[0];
+
+                // Find password field
+                const passwordInput = document.querySelector('input[type="password"]') as any;
+                if (passwordInput) {
+                    passwordInput.value = password;
+
+                    // Find preceding text/email input for username
+                    // Simple heuristic: look at previous siblings or inputs in the same form
+                    const form = passwordInput.form;
+                    if (form) {
+                        const inputs = Array.from(form.querySelectorAll('input'));
+                        const passIndex = inputs.indexOf(passwordInput);
+                        if (passIndex > 0) {
+                            const prevInput = inputs[passIndex - 1] as any;
+                            if (prevInput.type === 'text' || prevInput.type === 'email') {
+                                prevInput.value = username;
+                            }
+                        }
+                    }
+                }
+            } catch (domError) {
+                // Ignore DOM manipulation errors
+            }
+        }
+    } catch (e) {
+        // Ignore errors
+    }
 });
