@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('electron', {
             'ai_query',
             'passwords:list',
             'session:clear',
+            'reader:toggle',
+            'reader:status',
         ];
 
         if (validChannels.includes(channel)) {

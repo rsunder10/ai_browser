@@ -12,6 +12,7 @@ import { PasswordManager } from './managers/PasswordManager';
 import { PermissionsManager } from './managers/PermissionsManager';
 import { SessionManager } from './managers/SessionManager';
 import { AIManager } from './managers/AIManager';
+import { ReaderManager } from './managers/ReaderManager';
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
@@ -26,6 +27,7 @@ const passwordManager = new PasswordManager();
 const permissionsManager = new PermissionsManager();
 const sessionManager = new SessionManager();
 const aiManager = new AIManager();
+const readerManager = new ReaderManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -581,5 +583,35 @@ ipcMain.handle('permissions:clear', async (event, origin) => {
 ipcMain.handle('ai_query', async (event, { provider, prompt }) => {
     return aiManager.processQuery(provider, prompt);
 });
+
+// Reader Mode IPC
+ipcMain.handle('reader:toggle', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+
+    // We need the WebContents of the *active tab*, not the main window
+    // The TabManager manages BrowserViews. We need to get the active BrowserView.
+    const activeTabId = tm.getActiveTabId();
+    if (!activeTabId) return false;
+
+    const view = tm.getTab(activeTabId);
+    if (!view) return false;
+
+    return readerManager.toggleReaderMode(view.webContents);
+});
+
+ipcMain.handle('reader:status', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+
+    const activeTabId = tm.getActiveTabId();
+    if (!activeTabId) return false;
+
+    const view = tm.getTab(activeTabId);
+    if (!view) return false;
+
+    return readerManager.isReaderActive(view.webContents.id);
+});
+
 
 

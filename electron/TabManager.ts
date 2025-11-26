@@ -430,6 +430,12 @@ export class TabManager {
         }));
     }
 
+    getTab(tabId: string): BrowserView | null {
+        const tab = this.tabs.get(tabId);
+        return tab ? tab.view : null;
+    }
+
+
     getActiveTabId(): string | null {
         return this.activeTabId;
     }

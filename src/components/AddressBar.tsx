@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Star } from 'lucide-react';
+import { Lock, Star, BookOpen } from 'lucide-react';
 
 interface AddressBarProps {
     currentUrl: string;
@@ -83,6 +83,17 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
                 onKeyDown={handleKeyDown}
                 placeholder="Search or enter address"
             />
+            <button
+                className="bookmark-btn"
+                title="Toggle Reader Mode"
+                onClick={async () => {
+                    if (window.electron) {
+                        await window.electron.invoke('reader:toggle');
+                    }
+                }}
+            >
+                <BookOpen size={16} />
+            </button>
             <button
                 className="bookmark-btn"
                 title={isBookmarked ? "Remove bookmark" : "Bookmark this tab"}
