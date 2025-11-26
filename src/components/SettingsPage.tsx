@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home, Shield, Puzzle } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock } from 'lucide-react';
 
 interface SettingsData {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
@@ -44,6 +44,7 @@ export default function SettingsPage() {
                     <a href="#appearance">Appearance</a>
                     <a href="#startup">On Startup</a>
                     <a href="#privacy">Privacy & Security</a>
+                    <a href="#passwords">Passwords</a>
                     <a href="#extensions">Extensions</a>
                 </nav>
             </div>
@@ -126,6 +127,17 @@ export default function SettingsPage() {
                     </div>
                 </section>
 
+                <section id="passwords" className="settings-section">
+                    <h2><Lock size={20} /> Passwords</h2>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Saved Passwords</label>
+                            <p>Manage your saved passwords</p>
+                        </div>
+                        <PasswordsList />
+                    </div>
+                </section>
+
                 <section id="extensions" className="settings-section">
                     <h2><Puzzle size={20} /> Extensions</h2>
                     <div className="setting-item">
@@ -141,6 +153,96 @@ export default function SettingsPage() {
                         </button>
                     </div>
                 </section>
+            </div>
+        </div>
+    );
+}
+
+function PasswordsList() {
+    const [passwords, setPasswords] = useState<any[]>([]);
+    const [showAdd, setShowAdd] = useState(false);
+    const [newPassword, setNewPassword] = useState({ url: '', username: '', password: '' });
+
+    useEffect(() => {
+        loadPasswords();
+    }, []);
+
+    const loadPasswords = async () => {
+        if (window.electron) {
+            const list = await window.electron.invoke('passwords:list');
+            setPasswords(list || []);
+        }
+    };
+
+    const handleSave = async () => {
+        if (window.electron && newPassword.url && newPassword.username && newPassword.password) {
+            await window.electron.invoke('passwords:save', newPassword.url, newPassword.username, newPassword.password);
+            setNewPassword({ url: '', username: '', password: '' });
+            setShowAdd(false);
+            loadPasswords();
+        }
+    };
+
+    return (
+        <div style={{ marginTop: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                <button
+                    className="action-btn"
+                    onClick={() => setShowAdd(!showAdd)}
+                    style={{ padding: '6px 12px', background: '#1a73e8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                    {showAdd ? 'Cancel' : 'Add Password'}
+                </button>
+            </div>
+
+            {showAdd && (
+                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #dfe1e5' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <input
+                            placeholder="URL (e.g., google.com)"
+                            value={newPassword.url}
+                            onChange={e => setNewPassword({ ...newPassword, url: e.target.value })}
+                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #dadce0' }}
+                        />
+                        <input
+                            placeholder="Username"
+                            value={newPassword.username}
+                            onChange={e => setNewPassword({ ...newPassword, username: e.target.value })}
+                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #dadce0' }}
+                        />
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={newPassword.password}
+                            onChange={e => setNewPassword({ ...newPassword, password: e.target.value })}
+                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #dadce0' }}
+                        />
+                        <button
+                            onClick={handleSave}
+                            style={{ padding: '8px', background: '#1a73e8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', alignSelf: 'flex-start' }}
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {passwords.length === 0 ? (
+                    <div style={{ color: '#5f6368', fontStyle: 'italic' }}>No saved passwords</div>
+                ) : (
+                    passwords.map(p => (
+                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'white', border: '1px solid #dfe1e5', borderRadius: '6px' }}>
+                            <div>
+                                <div style={{ fontWeight: '500' }}>{new URL(p.url).hostname}</div>
+                                <div style={{ fontSize: '12px', color: '#5f6368' }}>{p.username}</div>
+                            </div>
+                            <div style={{ color: '#5f6368', fontSize: '12px' }}>
+                                ••••••••
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

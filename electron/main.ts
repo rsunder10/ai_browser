@@ -546,3 +546,31 @@ app.on('activate', () => {
         createWindow();
     }
 });
+
+// Password Manager IPC
+ipcMain.handle('passwords:save', async (event, url, username, password) => {
+    return passwordManager.savePassword(url, username, password);
+});
+
+ipcMain.handle('passwords:get', async (event, url) => {
+    return passwordManager.getCredentials(url);
+});
+
+ipcMain.handle('passwords:list', async () => {
+    return passwordManager.getAllPasswords();
+});
+
+// Permissions IPC
+ipcMain.handle('permissions:get-all', async () => {
+    return permissionsManager.getAllPermissions();
+});
+
+ipcMain.handle('permissions:set', async (event, { origin, permission, status }) => {
+    permissionsManager.setPermission(origin, permission, status);
+    return true;
+});
+
+ipcMain.handle('permissions:clear', async (event, origin) => {
+    permissionsManager.clearPermissionsForOrigin(origin);
+    return true;
+});

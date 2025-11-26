@@ -95,4 +95,8 @@ export class PasswordManager {
             })
             .filter((c): c is { username: string; password: string } => c !== null);
     }
+
+    getAllPasswords(): SavedPassword[] {
+        return this.passwords;
+    }
 }

@@ -60,4 +60,9 @@ export class PermissionsManager {
         this.permissions = [];
         this.savePermissions();
     }
+
+    clearPermissionsForOrigin(origin: string) {
+        this.permissions = this.permissions.filter(p => p.origin !== origin);
+        this.savePermissions();
+    }
 }
