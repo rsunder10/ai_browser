@@ -1,0 +1,62 @@
+{
+    "name": "neural-web",
+    "version": "0.1.0",
+    "description": "NeuralWeb - AI-Powered Browser built with Electron",
+    "main": "dist/electron/main.js",
+    "scripts": {
+        "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+        "dev:vite": "vite",
+        "dev:electron": "tsc -p electron/tsconfig.json && NODE_ENV=development electron .",
+        "build": "tsc -p electron/tsconfig.json && vite build",
+        "build:all": "npm run build && electron-builder",
+        "preview": "vite preview"
+    },
+    "keywords": [
+        "browser",
+        "ai",
+        "electron",
+        "chromium"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "uuid": "^13.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@types/react": "^18.2.43",
+        "@types/react-dom": "^18.2.17",
+        "@types/uuid": "^10.0.0",
+        "@vitejs/plugin-react": "^4.2.1",
+        "autoprefixer": "^10.4.16",
+        "concurrently": "^8.2.2",
+        "electron": "^28.0.0",
+        "electron-builder": "^24.9.1",
+        "postcss": "^8.4.32",
+        "tailwindcss": "^3.3.6",
+        "typescript": "^5.3.3",
+        "vite": "^5.0.8"
+    },
+    "build": {
+        "appId": "com.neuralweb.browser",
+        "productName": "NeuralWeb",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "dist/**/*",
+            "package.json"
+        ],
+        "mac": {
+            "category": "public.app-category.productivity"
+        },
+        "win": {
+            "target": "nsis"
+        },
+        "linux": {
+            "target": "AppImage"
+        }
+    }
+}
