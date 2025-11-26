@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { ArrowLeft, ArrowRight, RotateCw, Home } from 'lucide-react';
 
 interface NavigationControlsProps {

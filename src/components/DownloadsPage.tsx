@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, File, Pause, Play, X, FolderOpen, Trash2 } from 'lucide-react';
 
 interface DownloadRecord {

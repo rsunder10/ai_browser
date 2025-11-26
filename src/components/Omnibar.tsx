@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+
 
 interface OmnibarProps {
     onNavigate: (url: string) => void;
@@ -12,7 +12,7 @@ export default function Omnibar({ onNavigate }: OmnibarProps) {
         if (e.key === 'Enter') {
             if (input.startsWith('/ai ')) {
                 const prompt = input.slice(4);
-                const response = await invoke('ai_query', { provider: 'local', prompt });
+                const response = await window.electron.invoke('ai_query', { provider: 'local', prompt });
                 console.log(response);
                 alert(response);
             } else {

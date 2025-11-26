@@ -64,10 +64,7 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onNavigate(inputValue);
-    };
+
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {

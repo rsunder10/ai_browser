@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { X, Plus } from 'lucide-react';
 
 interface Tab {

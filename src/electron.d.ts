@@ -26,6 +26,7 @@ declare global {
             invoke(channel: 'downloads:cancel', id: string): Promise<void>;
             invoke(channel: 'downloads:open-file', id: string): Promise<void>;
             invoke(channel: 'downloads:clear'): Promise<void>;
+            invoke(channel: 'ai_query', data: { provider: string; prompt: string }): Promise<string>;
             // invoke: (channel: string, ...args: any[]) => Promise<any>;
             on: (channel: string, callback: (...args: any[]) => void) => void;
             removeListener: (channel: string, callback: (...args: any[]) => void) => void;

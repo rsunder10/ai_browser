@@ -1,4 +1,4 @@
-import React from 'react';
+
 import TabBar from './TabBar';
 import NavigationControls from './NavigationControls';
 import AddressBar from './AddressBar';
