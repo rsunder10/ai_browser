@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Star, BookOpen } from 'lucide-react';
+import { Lock, Star, BookOpen, Shield } from 'lucide-react';
 
 interface AddressBarProps {
     currentUrl: string;
@@ -14,12 +14,14 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
     const [isSecure, setIsSecure] = useState(currentUrl.startsWith('https://'));
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [bookmarkId, setBookmarkId] = useState<string | null>(null);
+    const [isAdBlockerEnabled, setIsAdBlockerEnabled] = useState(false);
 
     useEffect(() => {
         const display = currentUrl === 'neuralweb://home' ? 'Home' : currentUrl;
         setInputValue(display);
         setIsSecure(currentUrl.startsWith('https://'));
         checkBookmarkStatus();
+        checkAdBlockerStatus();
     }, [currentUrl]);
 
     const checkBookmarkStatus = async () => {
@@ -36,6 +38,17 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
         } else {
             setIsBookmarked(false);
             setBookmarkId(null);
+        }
+    };
+
+    const checkAdBlockerStatus = async () => {
+        if (window.electron) {
+            try {
+                const status = await window.electron.invoke('adblocker:status');
+                setIsAdBlockerEnabled(status);
+            } catch (e) {
+                console.error('Failed to check ad blocker status:', e);
+            }
         }
     };
 
@@ -64,7 +77,16 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
         }
     };
 
-
+    const toggleAdBlocker = async () => {
+        if (window.electron) {
+            try {
+                const status = await window.electron.invoke('adblocker:toggle');
+                setIsAdBlockerEnabled(status);
+            } catch (e) {
+                console.error('Failed to toggle ad blocker:', e);
+            }
+        }
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -83,6 +105,16 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
                 onKeyDown={handleKeyDown}
                 placeholder="Search or enter address"
             />
+            <button
+                className="bookmark-btn"
+                title={isAdBlockerEnabled ? "Disable Ad Blocker" : "Enable Ad Blocker"}
+                onClick={toggleAdBlocker}
+            >
+                <Shield
+                    size={16}
+                    fill={isAdBlockerEnabled ? "currentColor" : "none"}
+                />
+            </button>
             <button
                 className="bookmark-btn"
                 title="Toggle Reader Mode"

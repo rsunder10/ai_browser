@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('electron', {
             'reader:toggle',
             'reader:status',
             'passwords:delete',
+            'adblocker:toggle',
+            'adblocker:status',
         ];
 
         if (validChannels.includes(channel)) {

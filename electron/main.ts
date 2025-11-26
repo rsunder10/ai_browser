@@ -13,6 +13,21 @@ import { PermissionsManager } from './managers/PermissionsManager';
 import { SessionManager } from './managers/SessionManager';
 import { AIManager } from './managers/AIManager';
 import { ReaderManager } from './managers/ReaderManager';
+import { AdBlockerManager } from './managers/AdBlockerManager';
+
+// ... existing imports
+
+const adBlockerManager = new AdBlockerManager();
+
+// ... existing code
+
+ipcMain.handle('adblocker:toggle', () => {
+    return adBlockerManager.toggle();
+});
+
+ipcMain.handle('adblocker:status', () => {
+    return adBlockerManager.getStatus();
+});
 
 // Manage multiple windows and their respective TabManagers
 const windows = new Map<number, BrowserWindow>();
