@@ -5,13 +5,21 @@ import * as fs from 'fs';
 export interface TabState {
     url: string;
     title: string;
+    groupId?: string;
+}
+
+export interface TabGroupState {
+    id: string;
+    name: string;
+    color: string;
 }
 
 export interface SessionState {
     windows: {
         [windowId: number]: {
             tabs: TabState[];
-            activeTabId: string | null; // We might not be able to restore exact IDs, but we can track index
+            groups: TabGroupState[];
+            activeTabId: string | null;
             activeTabIndex: number;
         }
     }
@@ -55,9 +63,10 @@ export class SessionManager {
         }, 1000);
     }
 
-    updateWindow(windowId: number, tabs: TabState[], activeTabIndex: number) {
+    updateWindow(windowId: number, tabs: TabState[], groups: TabGroupState[], activeTabIndex: number) {
         this.state.windows[windowId] = {
             tabs,
+            groups,
             activeTabId: null,
             activeTabIndex
         };

@@ -56,6 +56,13 @@ contextBridge.exposeInMainWorld('electron', {
             'passwords:delete',
             'adblocker:toggle',
             'adblocker:status',
+            'tabs:create-group',
+            'tabs:add-to-group',
+            'tabs:remove-from-group',
+            'tabs:get-groups',
+            'tabs:delete-group',
+            'tabs:show-context-menu',
+            'tabs:set-visibility',
         ];
 
         if (validChannels.includes(channel)) {
@@ -63,14 +70,14 @@ contextBridge.exposeInMainWorld('electron', {
         }
     },
     on: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find'];
+        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (_event, ...args) => callback(...args));
         }
     },
     removeListener: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find'];
+        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.removeListener(channel, callback);

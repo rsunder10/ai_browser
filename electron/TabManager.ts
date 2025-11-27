@@ -6,6 +6,12 @@ import { HistoryManager } from './managers/HistoryManager';
 import { PasswordManager } from './managers/PasswordManager';
 import { SessionManager } from './managers/SessionManager';
 
+interface TabGroup {
+    id: string;
+    name: string;
+    color: string;
+}
+
 interface Tab {
     id: string;
     view: BrowserView;
@@ -14,10 +20,12 @@ interface Tab {
     favicon?: string;
     history: string[];
     historyIndex: number;
+    groupId?: string;
 }
 
 export class TabManager {
     private tabs: Map<string, Tab> = new Map();
+    private groups: Map<string, TabGroup> = new Map();
     private activeTabId: string | null = null;
     private mainWindow: BrowserWindow | null = null;
     private settingsManager: SettingsManager;
@@ -54,8 +62,11 @@ export class TabManager {
 
         const tabsList = this.getTabs().map(t => ({
             url: t.url,
-            title: t.title
+            title: t.title,
+            groupId: t.groupId
         }));
+
+        const groupsList = this.getGroups();
 
         // Assuming tabOrder is managed elsewhere or we need to derive it
         // For now, let's just save the active tab ID and the list of tabs
@@ -66,7 +77,7 @@ export class TabManager {
             return activeTab && t.url === activeTab.url && t.title === activeTab.title;
         });
 
-        this.sessionManager.updateWindow(this.mainWindow.id, tabsList, activeIndex);
+        this.sessionManager.updateWindow(this.mainWindow.id, tabsList, groupsList, activeIndex);
     }
 
     private setupBrowserView(view: BrowserView, tabId: string): void {
@@ -420,13 +431,14 @@ export class TabManager {
         }
     }
 
-    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; history_index: number }> {
+    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; history_index: number; groupId?: string }> {
         return Array.from(this.tabs.values()).map(tab => ({
             id: tab.id,
             url: tab.url,
             title: tab.title,
             history: tab.history,
-            history_index: tab.historyIndex
+            history_index: tab.historyIndex,
+            groupId: tab.groupId
         }));
     }
 
@@ -570,6 +582,87 @@ export class TabManager {
         const tab = this.tabs.get(this.activeTabId);
         if (tab && tab.view) {
             tab.view.webContents.print();
+        }
+    }
+
+    // Tab Groups Management
+    createGroup(name: string, color: string): TabGroup {
+        const id = randomUUID();
+        const group = { id, name, color };
+        this.groups.set(id, group);
+        this.saveSession();
+        return group;
+    }
+
+    restoreGroup(group: TabGroup): void {
+        this.groups.set(group.id, group);
+    }
+
+    addTabToGroup(tabId: string, groupId: string): boolean {
+        const tab = this.tabs.get(tabId);
+        const group = this.groups.get(groupId);
+
+        if (!tab || !group) return false;
+
+        tab.groupId = groupId;
+        this.saveSession();
+
+        if (this.mainWindow) {
+            this.mainWindow.webContents.send('tab-updated');
+        }
+        return true;
+    }
+
+    removeTabFromGroup(tabId: string): boolean {
+        const tab = this.tabs.get(tabId);
+
+        if (!tab) return false;
+
+        tab.groupId = undefined;
+        this.saveSession();
+
+        if (this.mainWindow) {
+            this.mainWindow.webContents.send('tab-updated');
+        }
+        return true;
+    }
+
+    getGroups(): TabGroup[] {
+        return Array.from(this.groups.values());
+    }
+
+    deleteGroup(groupId: string): boolean {
+        // Remove groupId from all tabs in this group
+        this.tabs.forEach(tab => {
+            if (tab.groupId === groupId) {
+                tab.groupId = undefined;
+            }
+        });
+
+        const result = this.groups.delete(groupId);
+        if (result) {
+            this.saveSession();
+        }
+        return result;
+    }
+
+    setTabVisibility(visible: boolean): void {
+        if (!this.mainWindow || !this.activeTabId) return;
+
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.view) {
+            if (visible) {
+                this.mainWindow.addBrowserView(tab.view);
+                const bounds = this.mainWindow.getContentBounds();
+                tab.view.setBounds({
+                    x: 0,
+                    y: this.CHROME_HEIGHT,
+                    width: bounds.width,
+                    height: bounds.height - this.CHROME_HEIGHT,
+                });
+            } else {
+                this.mainWindow.removeBrowserView(tab.view);
+            }
         }
     }
 }

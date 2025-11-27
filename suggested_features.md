@@ -12,7 +12,7 @@ Based on a comprehensive review of the codebase, the following features are reco
 - [x] **Incognito Mode**: implemented.
 - [x] **AI Assistant Backend**: Implemented with mock handlers.
 - [x] **Reader Mode**: Implemented with toggle button.
-- [x] **Password Manager**: Backend, UI, and Auto-fill implemented.
+- [x] **Ad Blocker**: Implemented with `AdBlockerManager` and UI toggle.
 
 ## In Progress / Partial
 - [ ] **Extensions Support**:
@@ -21,27 +21,11 @@ Based on a comprehensive review of the codebase, the following features are reco
 
 ## New Suggestions (Next Steps)
 
-### 1. Ad Blocker
-- **Current State**: No blocking.
-- **Recommendation**: Implement basic request filtering using Electron's `webRequest` API.
-
-### 2. Tab Groups
+### 1. Tab Groups
 - **Current State**: Basic tabs only.
 - **Recommendation**: Allow users to group tabs by context (e.g., "Work", "Research").
 
-### 3. Session Restore Polish
-- **Current State**: Basic restore exists.
-- **Recommendation**: Ensure scroll position and history state are preserved per tab.
-
-### 3. Tab Groups
-- **Current State**: Basic tabs only.
-- **Recommendation**: Allow users to group tabs by context (e.g., "Work", "Research").
-
-### 4. Ad Blocker
-- **Current State**: No blocking.
-- **Recommendation**: Implement basic request filtering using Electron's `webRequest` API.
-
-### 5. Session Restore Polish
+### 2. Session Restore Polish
 - **Current State**: Basic restore exists.
 - **Recommendation**: Ensure scroll position and history state are preserved per tab.
 

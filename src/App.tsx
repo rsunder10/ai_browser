@@ -16,6 +16,7 @@ interface Tab {
   title: string;
   history: string[];
   history_index: number;
+  groupId?: string;
 }
 
 function App() {

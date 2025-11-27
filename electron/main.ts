@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, BrowserView, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, BrowserView, ipcMain, Menu, MenuItem, dialog } from 'electron';
 import * as path from 'path';
 import { TabManager } from './TabManager';
 
@@ -50,8 +50,8 @@ function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     return tabManagers.get(window.id) || null;
 }
 
-function createWindow(options: { incognito?: boolean, initialTabs?: { url: string, title: string }[] } = {}) {
-    const { incognito = false, initialTabs = [] } = options;
+function createWindow(options: { incognito?: boolean, initialTabs?: { url: string, title: string, groupId?: string }[], initialGroups?: { id: string, name: string, color: string }[] } = {}) {
+    const { incognito = false, initialTabs = [], initialGroups = [] } = options;
 
     const window = new BrowserWindow({
         width: 1200,
@@ -121,9 +121,19 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
 
     // Restore tabs or create default
     window.webContents.once('did-finish-load', async () => {
+        // Restore groups first
+        if (initialGroups.length > 0) {
+            for (const group of initialGroups) {
+                tabManager.restoreGroup(group);
+            }
+        }
+
         if (initialTabs.length > 0) {
             for (const tab of initialTabs) {
-                await tabManager.createTab(window, tab.url);
+                const tabId = await tabManager.createTab(window, tab.url);
+                if (tab.groupId) {
+                    tabManager.addTabToGroup(tabId, tab.groupId);
+                }
             }
         } else {
             // Default tab
@@ -132,6 +142,11 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
                 await tabManager.createTab(window, 'neuralweb://home');
             }
         }
+    });
+
+    // Disable default context menu on main window to allow React components to handle it
+    window.webContents.on('context-menu', (event) => {
+        event.preventDefault();
     });
 
     window.on('close', (e) => {
@@ -542,7 +557,7 @@ app.whenReady().then(() => {
         // Restore windows
         for (const winId of windowIds) {
             const winState = lastSession.windows[winId];
-            createWindow({ initialTabs: winState.tabs });
+            createWindow({ initialTabs: winState.tabs, initialGroups: winState.groups });
         }
     } else {
         createWindow();
@@ -630,6 +645,88 @@ ipcMain.handle('reader:status', async (event) => {
     if (!view) return false;
 
     return readerManager.isReaderActive(view.webContents.id);
+});
+
+// Tab Groups IPC
+ipcMain.handle('tabs:create-group', async (event, name: string, color: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return null;
+    return tm.createGroup(name, color);
+});
+
+ipcMain.handle('tabs:add-to-group', async (event, tabId: string, groupId: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+    return tm.addTabToGroup(tabId, groupId);
+});
+
+ipcMain.handle('tabs:remove-from-group', async (event, tabId: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+    return tm.removeTabFromGroup(tabId);
+});
+
+ipcMain.handle('tabs:get-groups', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return [];
+    return tm.getGroups();
+});
+
+ipcMain.handle('tabs:delete-group', async (event, groupId: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+    return tm.deleteGroup(groupId);
+});
+
+// Tab Context Menu
+ipcMain.handle('tabs:show-context-menu', async (event, tabId: string, hasGroup: boolean) => {
+    const tm = getTabManager(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!tm || !win) return;
+
+    const groups = tm.getGroups();
+    const menu = new Menu();
+
+    if (hasGroup) {
+        // Tab is in a group - show option to remove from group
+        menu.append(new MenuItem({
+            label: 'Remove from Group',
+            click: () => {
+                tm.removeTabFromGroup(tabId);
+            }
+        }));
+    } else {
+        // Tab is not in a group - show group assignment options
+        menu.append(new MenuItem({
+            label: 'Add to Group',
+            type: 'submenu',
+            submenu: Menu.buildFromTemplate([
+                ...groups.map(group => ({
+                    label: group.name,
+                    click: () => {
+                        tm.addTabToGroup(tabId, group.id);
+                    }
+                })),
+                { type: 'separator' as const },
+                {
+                    label: 'New Group...',
+                    click: () => {
+                        // Trigger frontend dialog to ask for group name
+                        console.log('Main: Sending show-create-group-dialog to renderer');
+                        win.webContents.send('show-create-group-dialog', tabId);
+                    }
+                }
+            ])
+        }));
+    }
+
+    menu.popup({ window: win });
+});
+
+ipcMain.handle('tabs:set-visibility', async (event, visible: boolean) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.setTabVisibility(visible);
 });
 
 
