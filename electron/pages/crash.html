@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Aw, Snap!</title>
+    <style>
+        body {
+            background-color: #202124;
+            color: #bdc1c6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .icon {
+            font-size: 72px;
+            margin-bottom: 24px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 12px;
+            color: #e8eaed;
+        }
+        p {
+            font-size: 14px;
+            margin-bottom: 24px;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+        button {
+            background-color: #8ab4f8;
+            color: #202124;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #76a7fa;
+        }
+        .details {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #9aa0a6;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon">😵</div>
+    <h1>Aw, Snap!</h1>
+    <p>Something went wrong while displaying this webpage.</p>
+    <button id="reload">Reload</button>
+    <div class="details" id="details"></div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const url = params.get('url');
+        const reason = params.get('reason');
+
+        document.getElementById('details').textContent = `Error code: ${reason || 'UNKNOWN'}`;
+
+        document.getElementById('reload').addEventListener('click', () => {
+            if (url) {
+                window.location.href = url;
+            } else {
+                window.history.back();
+            }
+        });
+    </script>
+</body>
+</html>

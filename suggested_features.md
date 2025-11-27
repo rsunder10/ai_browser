@@ -30,5 +30,5 @@ Based on a comprehensive review of the codebase, the following features are reco
 - **Recommendation**: Scroll position and history state are preserved per tab.
 
 ## Technical Improvements
-- **Crash Handling**: Better error pages for renderer crashes.
+- **Crash Handling**: Implemented with "Aw, Snap!" page and `neuralweb://crash` for testing.
 - **Performance**: Optimize BrowserView resizing and switching.

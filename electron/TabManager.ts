@@ -226,6 +226,20 @@ export class TabManager {
         view.webContents.on('did-finish-load', () => {
             this.log('Page loaded for tab:', tabId);
         });
+
+        // Crash handling
+        view.webContents.on('render-process-gone', (_event, details) => {
+            console.error('[TabManager] Renderer process gone:', details.reason);
+            const tab = this.tabs.get(tabId);
+            if (tab) {
+                const crashUrl = `file://${path.join(__dirname, 'pages/crash.html')}?url=${encodeURIComponent(tab.url)}&reason=${details.reason}`;
+                // We need to reload the view or navigate it. Since the process is gone, we might need to reload the URL to restart the process,
+                // but we want to show the crash page.
+                // Electron docs say: "The webContents object will remain alive... reloading will restart the process."
+                // So we can just load the crash URL.
+                view.webContents.loadURL(crashUrl).catch(err => console.error('Failed to load crash page:', err));
+            }
+        });
     }
 
     async createTab(mainWindow: BrowserWindow, url: string, initialState?: { history?: string[], historyIndex?: number, scrollPosition?: { x: number, y: number } }): Promise<string> {
@@ -247,14 +261,17 @@ export class TabManager {
 
         // Handle special neuralweb:// protocol
         if (url.startsWith('neuralweb://')) {
-            this.tabs.set(tabId, tabInfo);
-            this.switchTab(mainWindow, tabId);
-            this.saveSession();
-            return tabId;
+            // Special case for crash test: treat as regular page so it gets a BrowserView
+            if (url !== 'neuralweb://crash') {
+                this.tabs.set(tabId, tabInfo);
+                this.switchTab(mainWindow, tabId);
+                this.saveSession();
+                return tabId;
+            }
         }
 
-        // Ensure URL has protocol for regular pages
-        const urlString = url.startsWith('http://') || url.startsWith('https://')
+        // Ensure URL has protocol for regular pages (and crash test)
+        const urlString = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('neuralweb://')
             ? url
             : `https://${url}`;
 
@@ -282,11 +299,18 @@ export class TabManager {
         // Setup all event listeners
         this.setupBrowserView(view, tabId);
 
-        // Load URL with error handling
-        this.log('Loading URL:', urlString);
-        view.webContents.loadURL(urlString).catch((err) => {
-            console.error(`[TabManager] Failed to load URL ${urlString}:`, err);
-        });
+        if (url === 'neuralweb://crash') {
+            // Force crash for testing
+            setTimeout(() => {
+                view.webContents.forcefullyCrashRenderer();
+            }, 1000);
+        } else {
+            // Load URL with error handling
+            this.log('Loading URL:', urlString);
+            view.webContents.loadURL(urlString).catch((err) => {
+                console.error(`[TabManager] Failed to load URL ${urlString}:`, err);
+            });
+        }
 
         // Restore scroll position if available
         if (initialState?.scrollPosition) {
