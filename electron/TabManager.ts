@@ -22,6 +22,8 @@ interface Tab {
     historyIndex: number;
     groupId?: string;
     scrollPosition?: { x: number; y: number };
+    pinned: boolean;
+    muted: boolean;
 }
 
 export class TabManager {
@@ -214,6 +216,30 @@ export class TabManager {
                 }));
             }
 
+            // Save Image
+            if (params.mediaType === 'image') {
+                menu.append(new MenuItem({ type: 'separator' }));
+                menu.append(new MenuItem({
+                    label: 'Save Image As...',
+                    click: () => {
+                        view.webContents.downloadURL(params.srcURL);
+                    }
+                }));
+            }
+
+            // Open Link in New Tab
+            if (params.linkURL) {
+                menu.append(new MenuItem({ type: 'separator' }));
+                menu.append(new MenuItem({
+                    label: 'Open Link in New Tab',
+                    click: () => {
+                        if (this.mainWindow) {
+                            this.createTab(this.mainWindow, params.linkURL);
+                        }
+                    }
+                }));
+            }
+
             menu.popup();
         });
 
@@ -256,7 +282,9 @@ export class TabManager {
             view: null as any, // Will be set for non-home pages
             history: initialState?.history || [],
             historyIndex: initialState?.historyIndex || 0,
-            scrollPosition: initialState?.scrollPosition
+            scrollPosition: initialState?.scrollPosition,
+            pinned: false,
+            muted: false
         };
 
         // Handle special neuralweb:// protocol
@@ -493,7 +521,7 @@ export class TabManager {
         }
     }
 
-    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; scrollPosition?: { x: number; y: number } }> {
+    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; scrollPosition?: { x: number; y: number }; pinned: boolean; muted: boolean }> {
         return Array.from(this.tabs.values()).map(tab => ({
             id: tab.id,
             url: tab.url,
@@ -501,7 +529,9 @@ export class TabManager {
             history: tab.history,
             historyIndex: tab.historyIndex,
             groupId: tab.groupId,
-            scrollPosition: tab.scrollPosition
+            scrollPosition: tab.scrollPosition,
+            pinned: tab.pinned,
+            muted: tab.muted
         }));
     }
 
@@ -727,5 +757,48 @@ export class TabManager {
                 this.mainWindow.removeBrowserView(tab.view);
             }
         }
+    }
+
+    async duplicateTab(tabId: string): Promise<string | null> {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !this.mainWindow) return null;
+
+        return this.createTab(this.mainWindow, tab.url);
+    }
+
+    togglePin(tabId: string): boolean {
+        const tab = this.tabs.get(tabId);
+        if (!tab) return false;
+
+        tab.pinned = !tab.pinned;
+        this.saveSession();
+        if (this.mainWindow) {
+            this.mainWindow.webContents.send('tab-updated');
+        }
+        return tab.pinned;
+    }
+
+    toggleMute(tabId: string): boolean {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !tab.view) return false;
+
+        tab.muted = !tab.muted;
+        tab.view.webContents.setAudioMuted(tab.muted);
+
+        this.saveSession();
+        if (this.mainWindow) {
+            this.mainWindow.webContents.send('tab-updated');
+        }
+        return tab.muted;
+    }
+
+    closeOtherTabs(keepTabId: string): void {
+        if (!this.mainWindow) return;
+
+        const tabsToRemove = Array.from(this.tabs.keys()).filter(id => id !== keepTabId);
+
+        tabsToRemove.forEach(id => {
+            this.closeTab(this.mainWindow!, id);
+        });
     }
 }

@@ -1,5 +1,5 @@
 
-import { X, Plus, Folder } from 'lucide-react';
+import { X, Plus, Folder, Pin, VolumeX } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Tab {
@@ -7,6 +7,8 @@ interface Tab {
     url: string;
     title: string;
     groupId?: string;
+    pinned?: boolean;
+    muted?: boolean;
 }
 
 interface TabGroup {
@@ -114,16 +116,22 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                             showTabContextMenu(tab.id, false);
                         }}
                     >
-                        <span className="tab-title">{tab.title || 'New Tab'}</span>
-                        <button
-                            className="tab-close"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onTabClose(tab.id);
-                            }}
-                        >
-                            <X size={14} />
-                        </button>
+                        <span className="tab-title">
+                            {tab.pinned && <Pin size={12} style={{ marginRight: 6, transform: 'rotate(45deg)' }} />}
+                            {tab.title || 'New Tab'}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {tab.muted && <VolumeX size={12} style={{ color: '#9aa0a6' }} />}
+                            <button
+                                className="tab-close"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onTabClose(tab.id);
+                                }}
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
 
@@ -145,16 +153,22 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                                     showTabContextMenu(tab.id, true);
                                 }}
                             >
-                                <span className="tab-title">{tab.title || 'New Tab'}</span>
-                                <button
-                                    className="tab-close"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onTabClose(tab.id);
-                                    }}
-                                >
-                                    <X size={14} />
-                                </button>
+                                <span className="tab-title">
+                                    {tab.pinned && <Pin size={12} style={{ marginRight: 6, transform: 'rotate(45deg)' }} />}
+                                    {tab.title || 'New Tab'}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    {tab.muted && <VolumeX size={12} style={{ color: '#9aa0a6' }} />}
+                                    <button
+                                        className="tab-close"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onTabClose(tab.id);
+                                        }}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

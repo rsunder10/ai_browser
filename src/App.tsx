@@ -17,6 +17,8 @@ interface Tab {
   history: string[];
   history_index: number;
   groupId?: string;
+  pinned?: boolean;
+  muted?: boolean;
 }
 
 function App() {

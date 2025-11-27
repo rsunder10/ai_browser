@@ -690,6 +690,42 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string, hasGroup: 
 
     const groups = tm.getGroups();
     const menu = new Menu();
+    const tab = (await tm.getTabs()).find(t => t.id === tabId);
+    const isPinned = tab?.pinned || false;
+    const isMuted = tab?.muted || false; // Note: getTabs() return type doesn't have muted yet in main.ts view, but runtime it does
+
+    // Standard Tab Actions
+    menu.append(new MenuItem({
+        label: 'New Tab',
+        click: () => {
+            tm.createTab(win, 'neuralweb://home');
+        }
+    }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    menu.append(new MenuItem({
+        label: 'Duplicate',
+        click: () => {
+            tm.duplicateTab(tabId);
+        }
+    }));
+
+    menu.append(new MenuItem({
+        label: isPinned ? 'Unpin Tab' : 'Pin Tab',
+        click: () => {
+            tm.togglePin(tabId);
+        }
+    }));
+
+    menu.append(new MenuItem({
+        label: isMuted ? 'Unmute Site' : 'Mute Site',
+        click: () => {
+            tm.toggleMute(tabId);
+        }
+    }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
 
     if (hasGroup) {
         // Tab is in a group - show option to remove from group
@@ -723,6 +759,22 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string, hasGroup: 
             ])
         }));
     }
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    menu.append(new MenuItem({
+        label: 'Close Tab',
+        click: () => {
+            tm.closeTab(win, tabId);
+        }
+    }));
+
+    menu.append(new MenuItem({
+        label: 'Close Other Tabs',
+        click: () => {
+            tm.closeOtherTabs(tabId);
+        }
+    }));
 
     menu.popup({ window: win });
 });
