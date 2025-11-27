@@ -6,6 +6,9 @@ export interface TabState {
     url: string;
     title: string;
     groupId?: string;
+    scrollPosition?: { x: number; y: number };
+    history?: string[];
+    historyIndex?: number;
 }
 
 export interface TabGroupState {

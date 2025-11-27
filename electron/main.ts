@@ -50,7 +50,7 @@ function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     return tabManagers.get(window.id) || null;
 }
 
-function createWindow(options: { incognito?: boolean, initialTabs?: { url: string, title: string, groupId?: string }[], initialGroups?: { id: string, name: string, color: string }[] } = {}) {
+function createWindow(options: { incognito?: boolean, initialTabs?: { url: string, title: string, groupId?: string, scrollPosition?: { x: number, y: number }, history?: string[], historyIndex?: number }[], initialGroups?: { id: string, name: string, color: string }[] } = {}) {
     const { incognito = false, initialTabs = [], initialGroups = [] } = options;
 
     const window = new BrowserWindow({
@@ -130,7 +130,11 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
 
         if (initialTabs.length > 0) {
             for (const tab of initialTabs) {
-                const tabId = await tabManager.createTab(window, tab.url);
+                const tabId = await tabManager.createTab(window, tab.url, {
+                    history: tab.history,
+                    historyIndex: tab.historyIndex,
+                    scrollPosition: tab.scrollPosition
+                });
                 if (tab.groupId) {
                     tabManager.addTabToGroup(tabId, tab.groupId);
                 }

@@ -26,8 +26,8 @@ Based on a comprehensive review of the codebase, the following features are reco
 - **Recommendation**: Allow users to group tabs by context (e.g., "Work", "Research").
 
 ### 2. Session Restore Polish
-- **Current State**: Basic restore exists.
-- **Recommendation**: Ensure scroll position and history state are preserved per tab.
+- **Current State**: Implemented.
+- **Recommendation**: Scroll position and history state are preserved per tab.
 
 ## Technical Improvements
 - **Crash Handling**: Better error pages for renderer crashes.

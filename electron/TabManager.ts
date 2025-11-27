@@ -21,6 +21,7 @@ interface Tab {
     history: string[];
     historyIndex: number;
     groupId?: string;
+    scrollPosition?: { x: number; y: number };
 }
 
 export class TabManager {
@@ -57,13 +58,40 @@ export class TabManager {
         }
     }
 
-    private saveSession() {
+    private async captureScrollPosition(tabId: string): Promise<{ x: number; y: number } | undefined> {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !tab.view) return undefined;
+
+        try {
+            const position = await tab.view.webContents.executeJavaScript(`
+                ({ x: window.scrollX, y: window.scrollY })
+            `);
+            return position;
+        } catch (e) {
+            // Ignore errors (e.g. if page is destroyed)
+            return undefined;
+        }
+    }
+
+    private async saveSession() {
         if (!this.mainWindow || this.isIncognito) return;
+
+        // Capture scroll position for active tab before saving
+        if (this.activeTabId) {
+            const scroll = await this.captureScrollPosition(this.activeTabId);
+            const activeTab = this.tabs.get(this.activeTabId);
+            if (activeTab && scroll) {
+                activeTab.scrollPosition = scroll;
+            }
+        }
 
         const tabsList = this.getTabs().map(t => ({
             url: t.url,
             title: t.title,
-            groupId: t.groupId
+            groupId: t.groupId,
+            scrollPosition: t.scrollPosition,
+            history: t.history,
+            historyIndex: t.historyIndex
         }));
 
         const groupsList = this.getGroups();
@@ -200,7 +228,7 @@ export class TabManager {
         });
     }
 
-    createTab(mainWindow: BrowserWindow, url: string): string {
+    async createTab(mainWindow: BrowserWindow, url: string, initialState?: { history?: string[], historyIndex?: number, scrollPosition?: { x: number, y: number } }): Promise<string> {
         const tabId = `tab-${randomUUID()}`;
 
         // Store tab info first
@@ -212,8 +240,9 @@ export class TabManager {
                     (url === 'neuralweb://downloads' ? 'Downloads' :
                         (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url))),
             view: null as any, // Will be set for non-home pages
-            history: [],
-            historyIndex: 0
+            history: initialState?.history || [],
+            historyIndex: initialState?.historyIndex || 0,
+            scrollPosition: initialState?.scrollPosition
         };
 
         // Handle special neuralweb:// protocol
@@ -258,6 +287,15 @@ export class TabManager {
         view.webContents.loadURL(urlString).catch((err) => {
             console.error(`[TabManager] Failed to load URL ${urlString}:`, err);
         });
+
+        // Restore scroll position if available
+        if (initialState?.scrollPosition) {
+            view.webContents.once('did-finish-load', () => {
+                if (initialState.scrollPosition) {
+                    view.webContents.executeJavaScript(`window.scrollTo(${initialState.scrollPosition.x}, ${initialState.scrollPosition.y})`);
+                }
+            });
+        }
 
         // Update tab info with view
         tabInfo.url = urlString;
@@ -431,14 +469,15 @@ export class TabManager {
         }
     }
 
-    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; history_index: number; groupId?: string }> {
+    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; scrollPosition?: { x: number; y: number } }> {
         return Array.from(this.tabs.values()).map(tab => ({
             id: tab.id,
             url: tab.url,
             title: tab.title,
             history: tab.history,
-            history_index: tab.historyIndex,
-            groupId: tab.groupId
+            historyIndex: tab.historyIndex,
+            groupId: tab.groupId,
+            scrollPosition: tab.scrollPosition
         }));
     }
 
