@@ -13,6 +13,8 @@ Based on a comprehensive review of the codebase, the following features are reco
 - [x] **AI Assistant Backend**: Implemented with mock handlers.
 - [x] **Reader Mode**: Implemented with toggle button.
 - [x] **Ad Blocker**: Implemented with `AdBlockerManager` and UI toggle.
+- [x] **Session Restore Polish**: Scroll position and history state preserved.
+- [x] **Crash Handling**: "Aw, Snap!" page implemented.
 
 ## In Progress / Partial
 - [ ] **Extensions Support**:
@@ -25,10 +27,18 @@ Based on a comprehensive review of the codebase, the following features are reco
 - **Current State**: Basic tabs only.
 - **Recommendation**: Allow users to group tabs by context (e.g., "Work", "Research").
 
-### 2. Session Restore Polish
-- **Current State**: Implemented.
-- **Recommendation**: Scroll position and history state are preserved per tab.
+### 2. Chrome Consistency Features
+- **Enhanced Context Menus**:
+    - Right-click on tabs: Duplicate, Pin, Mute, Close Others, Add to Group.
+    - Right-click on content: Save Image, Open Link in New Tab/Window, Inspect.
+- **Downloads Bubble**: Modern popup UI for downloads (instead of just a page).
+- **Bookmarks Bar**: Toggleable bar below the address bar for quick access.
+- **Keyboard Shortcuts**: Audit and implement standard shortcuts (Ctrl+Shift+T, Ctrl+J, etc.).
+
+### 3. Advanced Features
+- **Omnibox Improvements**: Autocomplete, search suggestions, and rich entity display.
+- **Picture-in-Picture**: Support for popping out videos.
+- **PDF Viewer**: Integrated PDF viewing capability.
 
 ## Technical Improvements
-- **Crash Handling**: Implemented with "Aw, Snap!" page and `neuralweb://crash` for testing.
 - **Performance**: Optimize BrowserView resizing and switching.
