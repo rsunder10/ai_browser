@@ -1,237 +1,119 @@
-# NeuralWeb - AI-Powered Browser
+# NeuralWeb
 
-**Built with Electron + React + TypeScript**
-
-A modern, production-ready web browser with AI integration, featuring true multi-tab support using Electron's BrowserView API.
-
----
+An AI-powered desktop web browser built with Electron, React, and TypeScript. Each tab runs as a separate BrowserView with a local Ollama-backed AI assistant.
 
 ## Quick Start
 
 ```bash
-cd /Users/sunderr/Work/ai_browser/neural-web
-
-# Development
-npm run dev
-
-# Production Build
-npm run build:all
+npm install
+make dev
 ```
-
----
 
 ## Architecture
 
-### Technology Stack
-- **Frontend**: React 18 + TypeScript + Vite
-- **Backend**: Electron 28 + Node.js
-- **Styling**: Tailwind CSS + Custom CSS
-- **Tab Rendering**: Electron BrowserView API
+**Two-process model:**
+
+- **Main process** (`electron/`) — Node.js. Manages windows, BrowserViews, IPC, data persistence, and the Ollama sidecar.
+- **Renderer process** (`src/`) — React. Renders browser chrome only. Web content lives in BrowserViews, not React.
+- **IPC bridge** (`electron/preload.ts`) — Context-isolated bridge via `window.electron.invoke()` / `window.electron.on()`.
 
 ### Project Structure
+
 ```
 neural-web/
-├── electron/          # Main process (Node.js)
-│   ├── main.ts       # Window & IPC management
-│   ├── TabManager.ts # BrowserView tab system
-│   └── preload.ts    # Secure IPC bridge
-├── src/              # Renderer process (React)
-│   ├── App.tsx
+├── electron/                # Main process
+│   ├── main.ts              # Window management, IPC handlers, app lifecycle
+│   ├── TabManager.ts        # BrowserView tab lifecycle & navigation
+│   ├── preload.ts           # Secure IPC bridge
+│   ├── managers/
+│   │   ├── OllamaManager.ts # Ollama sidecar lifecycle
+│   │   ├── AIManager.ts     # LLM query routing via Ollama
+│   │   ├── BookmarksManager.ts
+│   │   ├── HistoryManager.ts
+│   │   ├── DownloadManager.ts
+│   │   ├── SessionManager.ts
+│   │   ├── SettingsManager.ts
+│   │   ├── PasswordManager.ts
+│   │   ├── PermissionsManager.ts
+│   │   ├── ExtensionsManager.ts
+│   │   ├── ReaderManager.ts
+│   │   └── AdBlockerManager.ts
+│   └── utils/
+│       └── Store.ts         # JSON file persistence
+├── src/                     # Renderer process
+│   ├── App.tsx              # Root component, tab state
 │   ├── components/
-│   │   ├── BrowserChrome.tsx
+│   │   ├── BrowserChrome.tsx # Chrome container
 │   │   ├── TabBar.tsx
 │   │   ├── AddressBar.tsx
 │   │   ├── NavigationControls.tsx
-│   │   └── AISidebar.tsx
-│   └── App.css
+│   │   ├── BookmarksBar.tsx
+│   │   ├── BrowserMenu.tsx
+│   │   ├── AISidebar.tsx
+│   │   ├── Omnibar.tsx
+│   │   ├── FindInPage.tsx
+│   │   ├── HomePage.tsx
+│   │   ├── BookmarksPage.tsx
+│   │   ├── HistoryPage.tsx
+│   │   ├── DownloadsPage.tsx
+│   │   ├── SettingsPage.tsx
+│   │   ├── SiteSettingsPage.tsx
+│   │   └── ExtensionsPage.tsx
+│   └── electron.d.ts       # IPC channel type definitions
 └── package.json
 ```
 
----
-
 ## Features
 
-### ✅ Core Browser Functionality
-- **Multi-Tab Support** - True single-window tabs using BrowserView
-- **Full Navigation** - Back, forward, refresh, home
-- **Address Bar** - URL input with SSL indicators
-- **Tab Management** - Create, close, switch tabs
-- **Universal Compatibility** - All websites work (no X-Frame-Options issues)
+### Browser
+- Multi-tab support via BrowserView (no iframe/X-Frame-Options issues)
+- Full navigation (back, forward, refresh, home)
+- Address bar with SSL indicators
+- Tab groups with color coding
+- Tab pinning and muting
+- Bookmarks and bookmarks bar
+- Browsing history with search
+- Download manager
+- Session save/restore
+- Find in page
+- Zoom controls and print
+- Reader mode
+- Ad blocker
+- Incognito mode (separate session partition)
+- Multiple windows
+- Extension loading
 
-### ✅ Modern UI
-- **Professional Chrome** - Tab bar, navigation controls, address bar
-- **Dark Theme** - Modern, sleek interface
-- **Responsive Design** - Adapts to window resizing
-- **Visual Feedback** - Hover effects, active states
+### AI
+- Local AI assistant via Ollama sidecar (`llama3.2:1b`)
+- Ollama binary auto-downloaded on first launch
+- AI sidebar with chat interface
+- IPC channels for status, model listing, and model pulling
 
-### ✅ AI Integration (Placeholder)
-- **AI Sidebar** - ChatGPT-style interface
-- **Quick Actions** - Summarize, explain, translate
-- **Context-Aware** - Knows current page URL
+### Internal Pages
+Built-in pages via `neuralweb://` scheme: home, bookmarks, history, downloads, settings, site settings, extensions.
 
----
+## Tech Stack
 
-## How It Works
-
-### BrowserView Architecture
-Each tab is an **embedded Chromium instance** (BrowserView) positioned below the browser chrome:
-
-```typescript
-// Create BrowserView for tab
-const view = new BrowserView();
-mainWindow.addBrowserView(view);
-
-// Position below chrome (100px)
-view.setBounds({
-  x: 0,
-  y: 100,
-  width: windowWidth,
-  height: windowHeight - 100
-});
-
-// Load website
-view.webContents.loadURL('https://google.com');
-```
-
-### Tab Switching
-Only the active tab's BrowserView is visible:
-
-```typescript
-// Hide all tabs
-tabs.forEach(tab => mainWindow.removeBrowserView(tab.view));
-
-// Show active tab
-mainWindow.addBrowserView(activeTab.view);
-```
-
-### IPC Communication
-Frontend ↔ Backend communication via secure IPC:
-
-```typescript
-// Frontend
-await window.electron.invoke('create-tab', url);
-
-// Backend
-ipcMain.handle('create-tab', (event, url) => {
-  return tabManager.createTab(mainWindow, url);
-});
-```
-
----
-
-## Key Advantages
-
-### vs. Tauri
-| Feature | Tauri | NeuralWeb (Electron) |
-|---------|-------|---------------------|
-| Tab System | Separate windows | Single window with BrowserView |
-| Site Compatibility | Some sites blocked | All sites work |
-| Integration | Disconnected feel | Seamless experience |
-| Browser Control | Limited | Full Chromium control |
-
-### vs. Traditional Browsers
-- **AI Integration** - Built-in AI assistant
-- **Customizable** - Full control over UI/UX
-- **Extensible** - Easy to add features
-- **Modern Stack** - React + TypeScript
-
----
+| Layer | Technology |
+|-------|-----------|
+| Framework | Electron 28 |
+| UI | React 18, TypeScript, Tailwind CSS |
+| Bundler | Vite 5 |
+| AI | Ollama (via electron-ollama) |
+| Icons | lucide-react |
+| Persistence | JSON files in `app.getPath('userData')` |
 
 ## Development
 
-### Available Scripts
 ```bash
-npm run dev          # Start dev server + Electron
-npm run dev:vite     # Start Vite only
-npm run dev:electron # Start Electron only
-npm run build        # Build frontend
-npm run build:all    # Build + package for distribution
+make dev          # Start dev environment (Vite HMR + Electron)
+make build        # Compile TypeScript + Vite build
+make package      # Build + package with electron-builder
+make clean        # Remove dist/ and release/ directories
 ```
 
-### Development Workflow
-1. `npm run dev` starts both Vite and Electron
-2. Vite serves React UI on `localhost:5173`
-3. Electron loads UI from Vite in development
-4. Hot reload enabled for frontend changes
-5. Restart Electron for backend changes
-
----
-
-## Future Enhancements
-
-### Planned Features
-- [ ] **Bookmarks** - Save and organize bookmarks
-- [ ] **History** - Browse history with search
-- [ ] **Downloads** - Download manager
-- [ ] **Settings** - Customization options
-- [ ] **Extensions** - Plugin system
-- [ ] **Session Restore** - Restore tabs on restart
-- [ ] **Incognito Mode** - Private browsing
-- [ ] **Dev Tools** - Built-in developer tools
-
-### AI Features
-- [ ] **Real AI Integration** - Connect to OpenAI/Anthropic
-- [ ] **Page Summarization** - AI-powered summaries
-- [ ] **Smart Search** - AI-enhanced search
-- [ ] **Auto-translate** - Real-time translation
-- [ ] **Content Analysis** - Extract key information
-
----
-
-## Technical Details
-
-### Dependencies
-```json
-{
-  "electron": "^28.0.0",
-  "react": "^18.2.0",
-  "vite": "^5.0.8",
-  "typescript": "^5.3.3"
-}
-```
-
-### Build Output
-- **Development**: ~50MB (Electron + Chromium)
-- **Production**: ~100-150MB (packaged app)
-- **Startup Time**: ~2-3 seconds
-
-### Browser Engine
-- **Chromium Version**: Latest (via Electron)
-- **JavaScript Engine**: V8
-- **Rendering**: Blink
-
----
-
-## Status
-
-**✅ Production Ready**
-
-The browser is fully functional with:
-- Multi-tab support
-- Full navigation
-- Universal site compatibility
-- Professional UI
-- AI sidebar (placeholder)
-
-Ready for:
-- Daily use
-- Further development
-- Feature additions
-- Customization
-
----
+Hot reload is enabled for renderer changes. Restart Electron for main process changes.
 
 ## License
 
-MIT License - Feel free to use, modify, and distribute.
-
----
-
-## Credits
-
-Built with:
-- [Electron](https://www.electronjs.org/)
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
+MIT
