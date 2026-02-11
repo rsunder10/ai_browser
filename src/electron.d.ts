@@ -64,6 +64,9 @@ declare global {
             invoke(channel: 'print:page'): Promise<void>;
 
             invoke(channel: 'ai_query', data: { provider: string; prompt: string }): Promise<string>;
+            invoke(channel: 'ai:status'): Promise<{ status: string; error: string | null }>;
+            invoke(channel: 'ai:models'): Promise<{ models: Array<{ name: string; size: number; digest: string }> }>;
+            invoke(channel: 'ai:pull-model', name: string): Promise<{ status: string }>;
             invoke(channel: string, ...args: any[]): Promise<any>;
 
             on(channel: string, func: (...args: any[]) => void): void;

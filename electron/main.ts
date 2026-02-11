@@ -14,6 +14,7 @@ import { SessionManager } from './managers/SessionManager';
 import { AIManager } from './managers/AIManager';
 import { ReaderManager } from './managers/ReaderManager';
 import { AdBlockerManager } from './managers/AdBlockerManager';
+import { OllamaManager } from './managers/OllamaManager';
 
 // ... existing imports
 
@@ -41,7 +42,8 @@ const extensionsManager = new ExtensionsManager();
 const passwordManager = new PasswordManager();
 const permissionsManager = new PermissionsManager();
 const sessionManager = new SessionManager();
-const aiManager = new AIManager();
+const ollamaManager = new OllamaManager();
+const aiManager = new AIManager(ollamaManager);
 const readerManager = new ReaderManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
@@ -554,6 +556,9 @@ ipcMain.handle('print:page', async (event) => {
 
 // App lifecycle
 app.whenReady().then(() => {
+    // Start Ollama sidecar in background (does not block window creation)
+    ollamaManager.start().catch(err => console.error('[Main] Ollama start failed:', err));
+
     const lastSession = sessionManager.getLastSession();
     const windowIds = Object.keys(lastSession.windows).map(Number);
 
@@ -571,6 +576,10 @@ app.whenReady().then(() => {
 ipcMain.handle('session:clear', async () => {
     sessionManager.clearSession();
     return true;
+});
+
+app.on('before-quit', () => {
+    ollamaManager.stop().catch(err => console.error('[Main] Ollama stop failed:', err));
 });
 
 app.on('window-all-closed', () => {
@@ -620,6 +629,18 @@ ipcMain.handle('permissions:clear', async (event, origin) => {
 // AI IPC
 ipcMain.handle('ai_query', async (event, { provider, prompt }) => {
     return aiManager.processQuery(provider, prompt);
+});
+
+ipcMain.handle('ai:status', async () => {
+    return ollamaManager.getStatus();
+});
+
+ipcMain.handle('ai:models', async () => {
+    return ollamaManager.listModels();
+});
+
+ipcMain.handle('ai:pull-model', async (event, name: string) => {
+    return ollamaManager.pullModel(name);
 });
 
 // Reader Mode IPC
