@@ -27,6 +27,7 @@ function App() {
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [showFindInPage, setShowFindInPage] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
+  const [pendingExplainText, setPendingExplainText] = useState<string | null>(null);
   const initialized = useRef(false);
 
   // Load tabs on mount
@@ -75,6 +76,13 @@ function App() {
       setShowFindInPage(true);
     };
     window.electron.on('trigger-find', handleTriggerFind);
+
+    // Listen for AI sidebar open from context menu
+    const handleOpenSidebar = (data: { text: string; action: string }) => {
+      setAiSidebarOpen(true);
+      setPendingExplainText(data.text);
+    };
+    window.electron.on('ai:open-sidebar', handleOpenSidebar);
 
     // Keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -126,6 +134,7 @@ function App() {
       if (window.electron) {
         window.electron.removeListener('tab-updated', handleTabUpdate);
         window.electron.removeListener('trigger-find', handleTriggerFind);
+        window.electron.removeListener('ai:open-sidebar', handleOpenSidebar);
       }
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -313,6 +322,8 @@ function App() {
         isOpen={aiSidebarOpen}
         onToggle={() => setAiSidebarOpen(!aiSidebarOpen)}
         currentUrl={currentUrl}
+        pendingExplainText={pendingExplainText}
+        onExplainConsumed={() => setPendingExplainText(null)}
       />
 
       {showFindInPage && (

@@ -64,11 +64,17 @@ declare global {
             invoke(channel: 'print:page'): Promise<void>;
 
             invoke(channel: 'ai_query', data: { provider: string; prompt: string }): Promise<string>;
+            invoke(channel: 'ai:chat-stream', data: { messages: Array<{ role: string; content: string }>; requestId: string }): Promise<void>;
+            invoke(channel: 'ai:summarize', data: { requestId: string }): Promise<void>;
+            invoke(channel: 'ai:suggest', query: string): Promise<string[]>;
             invoke(channel: 'ai:status'): Promise<{ status: string; error: string | null }>;
             invoke(channel: 'ai:models'): Promise<{ models: Array<{ name: string; size: number; digest: string }> }>;
             invoke(channel: 'ai:pull-model', name: string): Promise<{ status: string }>;
             invoke(channel: string, ...args: any[]): Promise<any>;
 
+            on(channel: 'ai:stream-chunk', func: (data: { requestId: string; content: string; done: boolean }) => void): void;
+            on(channel: 'ai:stream-end', func: (data: { requestId: string; error?: string }) => void): void;
+            on(channel: 'ai:open-sidebar', func: (data: { text: string; action: string }) => void): void;
             on(channel: string, func: (...args: any[]) => void): void;
             removeListener(channel: string, func: (...args: any[]) => void): void;
         };

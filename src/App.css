@@ -707,6 +707,63 @@ body {
   cursor: not-allowed;
 }
 
+/* AI Sidebar header extras */
+.ai-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-clear-btn {
+  background: #3c4043;
+  border: none;
+  color: #9aa0a6;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.ai-clear-btn:hover {
+  background: #48494c;
+  color: #e8eaed;
+}
+
+.ai-model-name {
+  font-size: 11px;
+  color: #9aa0a6;
+  display: block;
+  margin-top: 2px;
+}
+
+/* AI Suggestions Dropdown */
+.ai-suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #292a2d;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.ai-suggestion-item {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #e8eaed;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ai-suggestion-item:hover {
+  background: #3c4043;
+}
+
 
 /* Tab Content */
 .tab-content-container {

@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld('electron', {
             'zoom:reset',
             'print:page',
             'ai_query',
+            'ai:chat-stream',
+            'ai:summarize',
+            'ai:suggest',
             'ai:status',
             'ai:models',
             'ai:pull-model',
@@ -73,14 +76,14 @@ contextBridge.exposeInMainWorld('electron', {
         }
     },
     on: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog'];
+        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog', 'ai:stream-chunk', 'ai:stream-end', 'ai:open-sidebar'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (_event, ...args) => callback(...args));
         }
     },
     removeListener: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog'];
+        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog', 'ai:stream-chunk', 'ai:stream-end', 'ai:open-sidebar'];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.removeListener(channel, callback);

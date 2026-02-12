@@ -4,6 +4,8 @@ export interface Settings {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
     theme: 'system' | 'light' | 'dark';
     homePage: string;
+    aiModel: string;
+    aiSuggestionsEnabled: boolean;
 }
 
 export class SettingsManager {
@@ -15,7 +17,9 @@ export class SettingsManager {
             defaults: {
                 searchEngine: 'google',
                 theme: 'system',
-                homePage: 'neuralweb://home'
+                homePage: 'neuralweb://home',
+                aiModel: 'llama3.2:1b',
+                aiSuggestionsEnabled: false
             }
         });
     }

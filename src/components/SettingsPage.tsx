@@ -1,27 +1,48 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot } from 'lucide-react';
 
 interface SettingsData {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
     theme: 'system' | 'light' | 'dark';
     homePage: string;
+    aiModel: string;
+    aiSuggestionsEnabled: boolean;
 }
 
 export default function SettingsPage() {
     const [settings, setSettings] = useState<SettingsData>({
         searchEngine: 'google',
         theme: 'system',
-        homePage: 'neuralweb://home'
+        homePage: 'neuralweb://home',
+        aiModel: 'llama3.2:1b',
+        aiSuggestionsEnabled: false
     });
+    const [aiStatus, setAiStatus] = useState<{ status: string; error: string | null }>({ status: 'unknown', error: null });
+    const [aiModels, setAiModels] = useState<Array<{ name: string; size: number }>>([]);
 
     useEffect(() => {
         loadSettings();
+        loadAiInfo();
     }, []);
 
     const loadSettings = async () => {
         if (window.electron) {
             const data = await window.electron.invoke('settings:get');
             if (data) setSettings(data);
+        }
+    };
+
+    const loadAiInfo = async () => {
+        if (!window.electron) return;
+        try {
+            const status = await window.electron.invoke('ai:status');
+            setAiStatus(status);
+            if (status.status === 'running') {
+                const modelsData = await window.electron.invoke('ai:models');
+                setAiModels(modelsData?.models || []);
+            }
+        } catch (e) {
+            console.error('Failed to load AI info:', e);
         }
     };
 
@@ -43,6 +64,7 @@ export default function SettingsPage() {
                     <a href="#search" className="active">Search Engine</a>
                     <a href="#appearance">Appearance</a>
                     <a href="#startup">On Startup</a>
+                    <a href="#ai">AI Assistant</a>
                     <a href="#privacy">Privacy & Security</a>
                     <a href="#passwords">Passwords</a>
                     <a href="#extensions">Extensions</a>
@@ -108,6 +130,52 @@ export default function SettingsPage() {
                         >
                             Clear Session
                         </button>
+                    </div>
+                </section>
+
+                <section id="ai" className="settings-section">
+                    <h2><Bot size={20} /> AI Assistant</h2>
+                    <div className="setting-item">
+                        <label>Ollama Status</label>
+                        <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            background: aiStatus.status === 'running' ? '#e6f4ea' : aiStatus.status === 'error' ? '#fce8e6' : '#fef7e0',
+                            color: aiStatus.status === 'running' ? '#137333' : aiStatus.status === 'error' ? '#c5221f' : '#b05a00',
+                            display: 'inline-block',
+                            maxWidth: 'fit-content'
+                        }}>
+                            {aiStatus.status}{aiStatus.error ? `: ${aiStatus.error}` : ''}
+                        </span>
+                    </div>
+                    <div className="setting-item">
+                        <label>AI Model</label>
+                        <select
+                            value={settings.aiModel}
+                            onChange={(e) => updateSetting('aiModel', e.target.value)}
+                        >
+                            {aiModels.length > 0 ? (
+                                aiModels.map(m => (
+                                    <option key={m.name} value={m.name}>{m.name}</option>
+                                ))
+                            ) : (
+                                <option value={settings.aiModel}>{settings.aiModel}</option>
+                            )}
+                        </select>
+                    </div>
+                    <div className="setting-item">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                                type="checkbox"
+                                id="aiSuggestions"
+                                checked={settings.aiSuggestionsEnabled}
+                                onChange={(e) => updateSetting('aiSuggestionsEnabled', e.target.checked)}
+                                style={{ width: 'auto', maxWidth: 'none' }}
+                            />
+                            <label htmlFor="aiSuggestions" style={{ margin: 0 }}>Enable AI address bar suggestions</label>
+                        </div>
                     </div>
                 </section>
 

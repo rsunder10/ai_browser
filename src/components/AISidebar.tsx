@@ -1,63 +1,132 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface AISidebarProps {
     isOpen: boolean;
     onToggle: () => void;
     currentUrl: string;
+    pendingExplainText?: string | null;
+    onExplainConsumed?: () => void;
 }
 
-export default function AISidebar({ isOpen, onToggle, currentUrl }: AISidebarProps) {
-    const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([]);
+interface Message {
+    role: string;
+    content: string;
+}
+
+export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplainText, onExplainConsumed }: AISidebarProps) {
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [modelName, setModelName] = useState('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const handleSend = async () => {
-        if (!input.trim()) return;
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
-        const userMessage = input;
-        setInput('');
-        setMessages([...messages, { role: 'user', content: userMessage }]);
-        setIsLoading(true);
+    // Fetch model name on mount
+    useEffect(() => {
+        if (!window.electron) return;
+        window.electron.invoke('settings:get').then((settings: any) => {
+            if (settings?.aiModel) setModelName(settings.aiModel);
+        });
+    }, []);
 
-        try {
-            // Call AI query command
-            const response = await window.electron.invoke('ai_query', {
-                provider: 'local',
-                prompt: `Context: User is viewing ${currentUrl}\n\nQuestion: ${userMessage}`
+    const setupStreamListeners = useCallback((requestId: string) => {
+        const handleChunk = (data: { requestId: string; content: string; done: boolean }) => {
+            if (data.requestId !== requestId) return;
+            setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'assistant') {
+                    updated[updated.length - 1] = { ...last, content: last.content + data.content };
+                }
+                return updated;
             });
+        };
 
-            setMessages(prev => [...prev, { role: 'assistant', content: response as string }]);
-        } catch (error) {
-            console.error('AI query failed:', error);
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: 'Sorry, I encountered an error. Please try again.'
-            }]);
-        } finally {
+        const handleEnd = (data: { requestId: string; error?: string }) => {
+            if (data.requestId !== requestId) return;
+            if (data.error) {
+                setMessages(prev => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last && last.role === 'assistant' && !last.content) {
+                        updated[updated.length - 1] = { ...last, content: data.error || 'An error occurred.' };
+                    }
+                    return updated;
+                });
+            }
             setIsLoading(false);
-        }
-    };
+            window.electron.removeListener('ai:stream-chunk', handleChunk);
+            window.electron.removeListener('ai:stream-end', handleEnd);
+        };
 
-    const handleSummarize = async () => {
+        window.electron.on('ai:stream-chunk', handleChunk);
+        window.electron.on('ai:stream-end', handleEnd);
+    }, []);
+
+    const sendMessage = useCallback((text: string) => {
+        if (!text.trim() || isLoading) return;
+
+        const requestId = crypto.randomUUID();
+        const userMessage: Message = { role: 'user', content: text };
+        const assistantPlaceholder: Message = { role: 'assistant', content: '' };
+
+        setMessages(prev => {
+            const newMessages = [...prev, userMessage, assistantPlaceholder];
+
+            // Send full conversation (excluding empty assistant placeholder) to backend
+            const toSend = newMessages.filter(m => m.content.length > 0 || m.role !== 'assistant');
+            const chatMessages = toSend.filter(m => m.content.length > 0);
+
+            setupStreamListeners(requestId);
+            window.electron.invoke('ai:chat-stream', { messages: chatMessages, requestId });
+
+            return newMessages;
+        });
+
         setIsLoading(true);
-        try {
-            // Placeholder - AI summarize would go here
-            const response = `Summary of ${currentUrl}`;
-            setMessages(prev => [...prev,
-            { role: 'user', content: 'Summarize this page' },
-            { role: 'assistant', content: response }
-            ]);
-        } catch (error) {
-            console.error('Summarize failed:', error);
-        } finally {
-            setIsLoading(false);
-        }
+    }, [isLoading, setupStreamListeners]);
+
+    const handleSend = () => {
+        if (!input.trim()) return;
+        const text = input;
+        setInput('');
+        sendMessage(text);
     };
+
+    const handleSummarize = () => {
+        if (isLoading) return;
+
+        const requestId = 'summarize-' + crypto.randomUUID();
+        const userMessage: Message = { role: 'user', content: 'Summarize this page' };
+        const assistantPlaceholder: Message = { role: 'assistant', content: '' };
+
+        setMessages(prev => [...prev, userMessage, assistantPlaceholder]);
+        setIsLoading(true);
+
+        setupStreamListeners(requestId);
+        window.electron.invoke('ai:summarize', { requestId });
+    };
+
+    const handleClear = () => {
+        setMessages([]);
+    };
+
+    // Handle pending explain text from context menu
+    useEffect(() => {
+        if (pendingExplainText && isOpen && !isLoading) {
+            sendMessage(`Explain the following text:\n\n"${pendingExplainText}"`);
+            onExplainConsumed?.();
+        }
+    }, [pendingExplainText, isOpen, isLoading, sendMessage, onExplainConsumed]);
 
     if (!isOpen) {
         return (
             <button className="ai-toggle-btn" onClick={onToggle} title="Open AI Assistant">
-                🤖
+                AI
             </button>
         );
     }
@@ -65,20 +134,30 @@ export default function AISidebar({ isOpen, onToggle, currentUrl }: AISidebarPro
     return (
         <div className="ai-sidebar">
             <div className="ai-header">
-                <h3>AI Assistant</h3>
-                <button className="ai-close-btn" onClick={onToggle}>×</button>
+                <div>
+                    <h3>AI Assistant</h3>
+                    {modelName && <span className="ai-model-name">{modelName}</span>}
+                </div>
+                <div className="ai-header-actions">
+                    {messages.length > 0 && (
+                        <button className="ai-clear-btn" onClick={handleClear} title="Clear conversation">
+                            Clear
+                        </button>
+                    )}
+                    <button className="ai-close-btn" onClick={onToggle}>x</button>
+                </div>
             </div>
 
             <div className="ai-quick-actions">
                 <button onClick={handleSummarize} disabled={isLoading}>
-                    📝 Summarize Page
+                    Summarize Page
                 </button>
             </div>
 
             <div className="ai-messages">
                 {messages.length === 0 && (
                     <div className="ai-welcome">
-                        <p>👋 Hi! I can help you with:</p>
+                        <p>Hi! I can help you with:</p>
                         <ul>
                             <li>Summarizing this page</li>
                             <li>Answering questions about the content</li>
@@ -92,7 +171,10 @@ export default function AISidebar({ isOpen, onToggle, currentUrl }: AISidebarPro
                         <div className="message-content">{msg.content}</div>
                     </div>
                 ))}
-                {isLoading && <div className="ai-loading">Thinking...</div>}
+                {isLoading && messages[messages.length - 1]?.content === '' && (
+                    <div className="ai-loading">Thinking...</div>
+                )}
+                <div ref={messagesEndRef} />
             </div>
 
             <div className="ai-input-container">
@@ -110,7 +192,7 @@ export default function AISidebar({ isOpen, onToggle, currentUrl }: AISidebarPro
                     onClick={handleSend}
                     disabled={isLoading || !input.trim()}
                 >
-                    ➤
+                    &gt;
                 </button>
             </div>
         </div>

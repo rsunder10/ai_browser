@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Lock, Star, BookOpen, Shield } from 'lucide-react';
 
 interface AddressBarProps {
@@ -15,11 +15,17 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [bookmarkId, setBookmarkId] = useState<string | null>(null);
     const [isAdBlockerEnabled, setIsAdBlockerEnabled] = useState(false);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const display = currentUrl === 'neuralweb://home' ? 'Home' : currentUrl;
         setInputValue(display);
         setIsSecure(currentUrl.startsWith('https://'));
+        setShowSuggestions(false);
+        setSuggestions([]);
         checkBookmarkStatus();
         checkAdBlockerStatus();
     }, [currentUrl]);
@@ -88,23 +94,94 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate }: Addres
         }
     };
 
+    const fetchSuggestions = useCallback(async (query: string) => {
+        if (!window.electron || query.length < 3) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        try {
+            const results = await window.electron.invoke('ai:suggest', query);
+            if (results && results.length > 0) {
+                setSuggestions(results);
+                setShowSuggestions(true);
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+        } catch {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setInputValue(value);
+
+        // Debounce AI suggestions
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            fetchSuggestions(value);
+        }, 500);
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
+            setShowSuggestions(false);
+            setSuggestions([]);
             onNavigate(inputValue);
+        }
+        if (e.key === 'Escape') {
+            setShowSuggestions(false);
         }
     };
 
+    const handleSuggestionClick = (suggestion: string) => {
+        setInputValue(suggestion);
+        setShowSuggestions(false);
+        setSuggestions([]);
+        onNavigate(suggestion);
+    };
+
+    const handleFocus = () => {
+        setIsFocused(true);
+        if (suggestions.length > 0) setShowSuggestions(true);
+    };
+
+    const handleBlur = () => {
+        setIsFocused(false);
+        // Delay hiding to allow click on suggestion
+        setTimeout(() => setShowSuggestions(false), 200);
+    };
+
     return (
-        <div className="address-bar">
+        <div className="address-bar" style={{ position: 'relative' }}>
             {isSecure && <Lock size={14} className="ssl-indicator" />}
             <input
                 type="text"
                 className="url-input"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 placeholder="Search or enter address"
             />
+            {showSuggestions && isFocused && suggestions.length > 0 && (
+                <div className="ai-suggestions-dropdown">
+                    {suggestions.map((suggestion, idx) => (
+                        <div
+                            key={idx}
+                            className="ai-suggestion-item"
+                            onMouseDown={() => handleSuggestionClick(suggestion)}
+                        >
+                            {suggestion}
+                        </div>
+                    ))}
+                </div>
+            )}
             <button
                 className="bookmark-btn"
                 title={isAdBlockerEnabled ? "Disable Ad Blocker" : "Enable Ad Blocker"}

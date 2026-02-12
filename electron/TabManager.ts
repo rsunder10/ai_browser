@@ -36,6 +36,7 @@ export class TabManager {
     private passwordManager: PasswordManager;
     private sessionManager: SessionManager;
     private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
+    private onExplainText?: (text: string) => void;
     private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
     private readonly isIncognito = false; // TODO: Implement incognito mode
@@ -52,6 +53,10 @@ export class TabManager {
         if (this.isDevelopment) {
             console.log('[TabManager] Main window set');
         }
+    }
+
+    setOnExplainText(handler: (text: string) => void) {
+        this.onExplainText = handler;
     }
 
     private log(...args: any[]) {
@@ -195,6 +200,17 @@ export class TabManager {
                 menu.append(new MenuItem({ type: 'separator' }));
             } else if (params.selectionText) {
                 menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
+                const truncated = params.selectionText.length > 30
+                    ? params.selectionText.substring(0, 30) + '...'
+                    : params.selectionText;
+                menu.append(new MenuItem({
+                    label: `Explain "${truncated}"`,
+                    click: () => {
+                        if (this.onExplainText) {
+                            this.onExplainText(params.selectionText);
+                        }
+                    }
+                }));
                 menu.append(new MenuItem({ type: 'separator' }));
             }
 
@@ -543,6 +559,25 @@ export class TabManager {
 
     getActiveTabId(): string | null {
         return this.activeTabId;
+    }
+
+    async getActiveTabContent(): Promise<{ text: string; url: string; title: string } | null> {
+        if (!this.activeTabId) return null;
+        const tab = this.tabs.get(this.activeTabId);
+        if (!tab || !tab.view) return null;
+
+        try {
+            const text = await tab.view.webContents.executeJavaScript(
+                'document.body.innerText.substring(0, 15000)'
+            );
+            return {
+                text: text || '',
+                url: tab.url,
+                title: tab.title,
+            };
+        } catch {
+            return null;
+        }
     }
 
     private async loadVisitCounts() {

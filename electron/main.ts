@@ -43,7 +43,7 @@ const passwordManager = new PasswordManager();
 const permissionsManager = new PermissionsManager();
 const sessionManager = new SessionManager();
 const ollamaManager = new OllamaManager();
-const aiManager = new AIManager(ollamaManager);
+const aiManager = new AIManager(ollamaManager, settingsManager);
 const readerManager = new ReaderManager();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
@@ -74,6 +74,9 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
     // Create a new TabManager for this window
     const tabManager = new TabManager(historyManager, sessionManager);
     tabManager.setMainWindow(window);
+    tabManager.setOnExplainText((text) => {
+        window.webContents.send('ai:open-sidebar', { text, action: 'explain' });
+    });
     tabManagers.set(windowId, tabManager);
 
     // Update download manager to track this window (simplified for now, might need better multi-window handling)
@@ -629,6 +632,34 @@ ipcMain.handle('permissions:clear', async (event, origin) => {
 // AI IPC
 ipcMain.handle('ai_query', async (event, { provider, prompt }) => {
     return aiManager.processQuery(provider, prompt);
+});
+
+ipcMain.handle('ai:chat-stream', async (event, { messages, requestId }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    await aiManager.processQueryStream(win.webContents, requestId, messages);
+});
+
+ipcMain.handle('ai:summarize', async (event, { requestId }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const tm = getTabManager(event);
+    if (!win || !tm) return;
+
+    const content = await tm.getActiveTabContent();
+    if (!content) {
+        win.webContents.send('ai:stream-end', { requestId, error: 'Could not extract page content.' });
+        return;
+    }
+
+    const messages = [
+        { role: 'user', content: `Please summarize the following web page.\n\nTitle: ${content.title}\nURL: ${content.url}\n\nContent:\n${content.text}` },
+    ];
+    await aiManager.processQueryStream(win.webContents, requestId, messages);
+});
+
+ipcMain.handle('ai:suggest', async (event, query: string) => {
+    if (!settingsManager.get('aiSuggestionsEnabled')) return [];
+    return aiManager.getSuggestions(query);
 });
 
 ipcMain.handle('ai:status', async () => {
