@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface AISidebarProps {
     isOpen: boolean;
@@ -168,7 +169,13 @@ export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplain
                 )}
                 {messages.map((msg, idx) => (
                     <div key={idx} className={`ai-message ${msg.role}`}>
-                        <div className="message-content">{msg.content}</div>
+                        <div className="message-content">
+                            {msg.role === 'assistant' ? (
+                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            ) : (
+                                msg.content
+                            )}
+                        </div>
                     </div>
                 ))}
                 {isLoading && messages[messages.length - 1]?.content === '' && (
