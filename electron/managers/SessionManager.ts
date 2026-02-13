@@ -50,11 +50,25 @@ export class SessionManager {
         }
     }
 
-    private saveSession() {
+    private async writeAsync(): Promise<void> {
+        const tmpPath = this.sessionPath + '.tmp';
+        try {
+            await fs.promises.writeFile(tmpPath, JSON.stringify(this.state, null, 2));
+            await fs.promises.rename(tmpPath, this.sessionPath);
+        } catch (error) {
+            console.error('Failed to save session:', error);
+        }
+    }
+
+    flushSync(): void {
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = null;
+        }
         try {
             fs.writeFileSync(this.sessionPath, JSON.stringify(this.state, null, 2));
         } catch (error) {
-            console.error('Failed to save session:', error);
+            console.error('Failed to flush session:', error);
         }
     }
 
@@ -62,7 +76,8 @@ export class SessionManager {
     private queueSave() {
         if (this.saveTimeout) clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(() => {
-            this.saveSession();
+            this.saveTimeout = null;
+            this.writeAsync();
         }, 1000);
     }
 
@@ -87,6 +102,6 @@ export class SessionManager {
 
     clearSession() {
         this.state = { windows: {} };
-        this.saveSession();
+        this.writeAsync();
     }
 }

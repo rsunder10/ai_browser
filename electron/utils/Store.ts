@@ -5,6 +5,8 @@ import * as fs from 'fs';
 export class Store<T> {
     private path: string;
     private data: T;
+    private writeTimer: NodeJS.Timeout | null = null;
+    private readonly DEBOUNCE_MS = 150;
 
     constructor(opts: { configName: string; defaults: T }) {
         const userDataPath = app.getPath('userData');
@@ -18,7 +20,7 @@ export class Store<T> {
 
     set(key: keyof T, val: T[keyof T]): void {
         this.data[key] = val;
-        fs.writeFileSync(this.path, JSON.stringify(this.data));
+        this.queueWrite();
     }
 
     getAll(): T {
@@ -27,7 +29,38 @@ export class Store<T> {
 
     setAll(data: T): void {
         this.data = data;
-        fs.writeFileSync(this.path, JSON.stringify(this.data));
+        this.queueWrite();
+    }
+
+    /** Immediately flush pending writes (sync). Call from before-quit. */
+    flushSync(): void {
+        if (this.writeTimer) {
+            clearTimeout(this.writeTimer);
+            this.writeTimer = null;
+        }
+        try {
+            fs.writeFileSync(this.path, JSON.stringify(this.data));
+        } catch (error) {
+            console.error(`[Store] flushSync failed for ${this.path}:`, error);
+        }
+    }
+
+    private queueWrite(): void {
+        if (this.writeTimer) clearTimeout(this.writeTimer);
+        this.writeTimer = setTimeout(() => {
+            this.writeTimer = null;
+            this.writeAsync();
+        }, this.DEBOUNCE_MS);
+    }
+
+    private async writeAsync(): Promise<void> {
+        const tmpPath = this.path + '.tmp';
+        try {
+            await fs.promises.writeFile(tmpPath, JSON.stringify(this.data));
+            await fs.promises.rename(tmpPath, this.path);
+        } catch (error) {
+            console.error(`[Store] Async write failed for ${this.path}:`, error);
+        }
     }
 
     private parseDataFile(filePath: string, defaults: T): T {

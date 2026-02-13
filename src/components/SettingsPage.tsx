@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot, RefreshCw } from 'lucide-react';
 
 interface SettingsData {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
@@ -19,6 +19,13 @@ export default function SettingsPage() {
     });
     const [aiStatus, setAiStatus] = useState<{ status: string; error: string | null }>({ status: 'unknown', error: null });
     const [aiModels, setAiModels] = useState<Array<{ name: string; size: number }>>([]);
+
+    // Sync state
+    const [syncBookmarks, setSyncBookmarks] = useState(true);
+    const [syncHistory, setSyncHistory] = useState(true);
+    const [syncSettings, setSyncSettings] = useState(false);
+    const [importStrategy, setImportStrategy] = useState<'merge' | 'replace'>('merge');
+    const [syncMessage, setSyncMessage] = useState('');
 
     useEffect(() => {
         loadSettings();
@@ -53,6 +60,42 @@ export default function SettingsPage() {
         }
     };
 
+    const handleExport = async () => {
+        if (!window.electron) return;
+        setSyncMessage('');
+        try {
+            const result = await window.electron.invoke('sync:export', {
+                bookmarks: syncBookmarks,
+                history: syncHistory,
+                settings: syncSettings,
+            });
+            if (result.success) {
+                setSyncMessage(`Exported to ${result.path}`);
+            } else {
+                setSyncMessage('Export cancelled');
+            }
+        } catch (e) {
+            setSyncMessage('Export failed');
+        }
+    };
+
+    const handleImport = async () => {
+        if (!window.electron) return;
+        setSyncMessage('');
+        try {
+            const result = await window.electron.invoke('sync:import', {
+                strategy: importStrategy,
+            });
+            if (result.success) {
+                setSyncMessage(result.summary || 'Import complete');
+            } else {
+                setSyncMessage('Import cancelled');
+            }
+        } catch (e) {
+            setSyncMessage('Import failed');
+        }
+    };
+
     return (
         <div className="settings-page">
             <div className="settings-sidebar">
@@ -68,6 +111,7 @@ export default function SettingsPage() {
                     <a href="#privacy">Privacy & Security</a>
                     <a href="#passwords">Passwords</a>
                     <a href="#extensions">Extensions</a>
+                    <a href="#sync">Sync</a>
                 </nav>
             </div>
 
@@ -221,6 +265,76 @@ export default function SettingsPage() {
                         </button>
                     </div>
                 </section>
+
+                <section id="sync" className="settings-section">
+                    <h2><RefreshCw size={20} /> Sync</h2>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Export Data</label>
+                            <p>Save your browser data to a JSON file</p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                            <div style={{ display: 'flex', gap: '16px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+                                    <input type="checkbox" checked={syncBookmarks} onChange={e => setSyncBookmarks(e.target.checked)} style={{ width: 'auto' }} />
+                                    Bookmarks
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+                                    <input type="checkbox" checked={syncHistory} onChange={e => setSyncHistory(e.target.checked)} style={{ width: 'auto' }} />
+                                    History
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+                                    <input type="checkbox" checked={syncSettings} onChange={e => setSyncSettings(e.target.checked)} style={{ width: 'auto' }} />
+                                    Settings
+                                </label>
+                            </div>
+                            <button
+                                onClick={handleExport}
+                                style={{ padding: '8px 16px', background: '#1a73e8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', alignSelf: 'flex-start' }}
+                            >
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Import Data</label>
+                            <p>Load browser data from a JSON file</p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label style={{ fontSize: '13px' }}>Strategy:</label>
+                                <select
+                                    value={importStrategy}
+                                    onChange={e => setImportStrategy(e.target.value as 'merge' | 'replace')}
+                                    style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #dadce0' }}
+                                >
+                                    <option value="merge">Merge (add new items)</option>
+                                    <option value="replace">Replace (overwrite)</option>
+                                </select>
+                            </div>
+                            <button
+                                onClick={handleImport}
+                                style={{ padding: '8px 16px', background: '#1a73e8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', alignSelf: 'flex-start' }}
+                            >
+                                Import
+                            </button>
+                        </div>
+                    </div>
+                    {syncMessage && (
+                        <div className="setting-item">
+                            <div style={{
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                background: '#e6f4ea',
+                                color: '#137333',
+                                fontSize: '13px',
+                            }}>
+                                {syncMessage}
+                            </div>
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );
@@ -319,13 +433,7 @@ function PasswordsList() {
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button
-                                    onClick={async () => {
-                                        // We can't easily decrypt here without exposing the password to UI state first
-                                        // For now, let's just copy a placeholder or implement a 'copy' IPC
-                                        // A better approach is to ask backend to copy to clipboard
-                                        // But for this MVP, let's skip copy or implement it via a reveal toggle
-                                        // Let's just implement Delete for now as per plan
-                                    }}
+                                    onClick={async () => {}}
                                     style={{ padding: '4px 8px', background: 'none', border: '1px solid #dadce0', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                                     title="Copy Password"
                                 >

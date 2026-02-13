@@ -24,6 +24,8 @@ interface Tab {
     scrollPosition?: { x: number; y: number };
     pinned: boolean;
     muted: boolean;
+    suspended: boolean;
+    lastActiveAt: number;
 }
 
 export class TabManager {
@@ -39,13 +41,87 @@ export class TabManager {
     private onExplainText?: (text: string) => void;
     private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
-    private readonly isIncognito = false; // TODO: Implement incognito mode
+    private readonly isIncognito = false;
+    private suspensionInterval: NodeJS.Timeout | null = null;
+    private readonly SUSPEND_AFTER_MS = 10 * 60 * 1000; // 10 minutes
+    private aiSidebarWidth: number = 0; // 0 when closed, sidebar width when open
+    private overlayActive: boolean = false;
 
     constructor(historyManager: HistoryManager, sessionManager: SessionManager) {
         this.settingsManager = new SettingsManager();
         this.historyManager = historyManager;
         this.passwordManager = new PasswordManager();
         this.sessionManager = sessionManager;
+        this.startSuspensionCheck();
+    }
+
+    private startSuspensionCheck() {
+        this.suspensionInterval = setInterval(() => {
+            this.checkForSuspension();
+        }, 60_000);
+    }
+
+    private checkForSuspension() {
+        const now = Date.now();
+        this.tabs.forEach((tab, tabId) => {
+            if (tabId === this.activeTabId) return;
+            if (tab.suspended) return;
+            if (!tab.view) return;
+            // Don't suspend tabs playing audio
+            if (tab.view.webContents && !tab.view.webContents.isDestroyed() && tab.view.webContents.isCurrentlyAudible()) return;
+            if (now - tab.lastActiveAt > this.SUSPEND_AFTER_MS) {
+                this.suspendTab(tabId);
+            }
+        });
+    }
+
+    private suspendTab(tabId: string) {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !tab.view || tab.suspended) return;
+
+        this.log('Suspending tab:', tabId, tab.url);
+        if (this.mainWindow) {
+            this.mainWindow.removeBrowserView(tab.view);
+        }
+        if (!tab.view.webContents.isDestroyed()) {
+            (tab.view.webContents as any).destroy();
+        }
+        tab.view = null as any;
+        tab.suspended = true;
+        this.sendTabUpdate(tabId);
+    }
+
+    private async unsuspendTab(tabId: string): Promise<void> {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !tab.suspended || !this.mainWindow) return;
+
+        this.log('Unsuspending tab:', tabId, tab.url);
+        const view = new BrowserView({
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: false,
+            },
+        });
+
+        tab.view = view;
+        tab.suspended = false;
+        tab.lastActiveAt = Date.now();
+
+        this.setupBrowserView(view, tabId);
+
+        if (tab.url && !tab.url.startsWith('neuralweb://')) {
+            view.webContents.loadURL(tab.url).catch(err => {
+                console.error(`[TabManager] Failed to reload suspended tab ${tab.url}:`, err);
+            });
+            if (tab.scrollPosition) {
+                view.webContents.once('did-finish-load', () => {
+                    if (tab.scrollPosition) {
+                        view.webContents.executeJavaScript(`window.scrollTo(${tab.scrollPosition.x}, ${tab.scrollPosition.y})`);
+                    }
+                });
+            }
+        }
     }
 
     setMainWindow(window: BrowserWindow) {
@@ -65,6 +141,29 @@ export class TabManager {
         }
     }
 
+    private sendTabUpdate(tabId: string) {
+        if (!this.mainWindow) return;
+        const tab = this.tabs.get(tabId);
+        if (!tab) return;
+        this.mainWindow.webContents.send('tab-updated', {
+            id: tab.id,
+            url: tab.url,
+            title: tab.title,
+            history: tab.history,
+            historyIndex: tab.historyIndex,
+            groupId: tab.groupId,
+            scrollPosition: tab.scrollPosition,
+            pinned: tab.pinned,
+            muted: tab.muted,
+            suspended: tab.suspended,
+        });
+    }
+
+    private sendTabsListChanged() {
+        if (!this.mainWindow) return;
+        this.mainWindow.webContents.send('tabs:list-changed');
+    }
+
     private async captureScrollPosition(tabId: string): Promise<{ x: number; y: number } | undefined> {
         const tab = this.tabs.get(tabId);
         if (!tab || !tab.view) return undefined;
@@ -75,7 +174,6 @@ export class TabManager {
             `);
             return position;
         } catch (e) {
-            // Ignore errors (e.g. if page is destroyed)
             return undefined;
         }
     }
@@ -83,7 +181,6 @@ export class TabManager {
     private async saveSession() {
         if (!this.mainWindow || this.isIncognito) return;
 
-        // Capture scroll position for active tab before saving
         if (this.activeTabId) {
             const scroll = await this.captureScrollPosition(this.activeTabId);
             const activeTab = this.tabs.get(this.activeTabId);
@@ -103,10 +200,6 @@ export class TabManager {
 
         const groupsList = this.getGroups();
 
-        // Assuming tabOrder is managed elsewhere or we need to derive it
-        // For now, let's just save the active tab ID and the list of tabs
-        // A more robust solution would involve tracking the order of tabs in an array.
-        // For simplicity, let's assume the order in getTabs() is sufficient for now.
         const activeIndex = tabsList.findIndex(t => {
             const activeTab = this.tabs.get(this.activeTabId || '');
             return activeTab && t.url === activeTab.url && t.title === activeTab.title;
@@ -118,61 +211,48 @@ export class TabManager {
     private setupBrowserView(view: BrowserView, tabId: string): void {
         this.log('Setting up BrowserView for tab:', tabId);
 
-        // Title updates
         view.webContents.on('page-title-updated', (_event, title) => {
             const tab = this.tabs.get(tabId);
             if (tab) {
                 tab.title = title;
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
+                this.sendTabUpdate(tabId);
                 this.updatePageMetadata(tab.url, { title });
                 this.log('Title updated:', title, 'for tab:', tabId);
             }
         });
 
-        // Favicon updates
         view.webContents.on('page-favicon-updated', (_event, favicons) => {
             const tab = this.tabs.get(tabId);
             if (tab && favicons && favicons.length > 0) {
-                // Prefer high-res icons if available, but for now just take the first one
                 const favicon = favicons[0];
                 this.updatePageMetadata(tab.url, { favicon });
                 this.log('Favicon updated:', favicon, 'for tab:', tabId);
             }
         });
 
-        // URL navigation
         view.webContents.on('did-navigate', (_event, url) => {
             const tab = this.tabs.get(tabId);
             if (tab) {
                 tab.url = url;
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
+                this.sendTabUpdate(tabId);
                 this.recordNavigation(url);
                 this.log('Navigated to:', url);
             }
         });
 
-        // In-page navigation
         view.webContents.on('did-navigate-in-page', (_event, url) => {
             const tab = this.tabs.get(tabId);
             if (tab) {
                 tab.url = url;
-                if (this.mainWindow) {
-                    this.mainWindow.webContents.send('tab-updated', tabId);
-                }
+                this.sendTabUpdate(tabId);
                 this.recordNavigation(url);
             }
         });
 
-        // Add context menu support
         view.webContents.on('context-menu', (_event, params) => {
             this.log('Context menu triggered at:', params.x, params.y);
             const menu = new Menu();
 
-            // Navigation options
             menu.append(new MenuItem({
                 label: 'Back',
                 enabled: view.webContents.canGoBack(),
@@ -192,7 +272,6 @@ export class TabManager {
 
             menu.append(new MenuItem({ type: 'separator' }));
 
-            // Text editing options
             if (params.isEditable) {
                 menu.append(new MenuItem({ label: 'Cut', role: 'cut' }));
                 menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
@@ -214,25 +293,21 @@ export class TabManager {
                 menu.append(new MenuItem({ type: 'separator' }));
             }
 
-            // Inspect Element (always in development)
             if (this.isDevelopment) {
                 menu.append(new MenuItem({
                     label: 'Inspect Element',
                     click: () => {
                         this.log('Opening DevTools at:', params.x, params.y);
 
-                        // Open docked to right for standard Chrome feel
                         if (!view.webContents.isDevToolsOpened()) {
                             view.webContents.openDevTools({ mode: 'right', activate: true });
                         }
 
-                        // Inspect the specific element
                         view.webContents.inspectElement(params.x, params.y);
                     }
                 }));
             }
 
-            // Save Image
             if (params.mediaType === 'image') {
                 menu.append(new MenuItem({ type: 'separator' }));
                 menu.append(new MenuItem({
@@ -243,7 +318,6 @@ export class TabManager {
                 }));
             }
 
-            // Open Link in New Tab
             if (params.linkURL) {
                 menu.append(new MenuItem({ type: 'separator' }));
                 menu.append(new MenuItem({
@@ -259,27 +333,46 @@ export class TabManager {
             menu.popup();
         });
 
-        // Error handling
         view.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
             console.error('[TabManager] Failed to load:', errorDescription, 'Code:', errorCode);
         });
 
-        // Log when page finishes loading
         view.webContents.on('did-finish-load', () => {
             this.log('Page loaded for tab:', tabId);
         });
 
-        // Crash handling
         view.webContents.on('render-process-gone', (_event, details) => {
             console.error('[TabManager] Renderer process gone:', details.reason);
             const tab = this.tabs.get(tabId);
             if (tab) {
                 const crashUrl = `file://${path.join(__dirname, 'pages/crash.html')}?url=${encodeURIComponent(tab.url)}&reason=${details.reason}`;
-                // We need to reload the view or navigate it. Since the process is gone, we might need to reload the URL to restart the process,
-                // but we want to show the crash page.
-                // Electron docs say: "The webContents object will remain alive... reloading will restart the process."
-                // So we can just load the crash URL.
                 view.webContents.loadURL(crashUrl).catch(err => console.error('Failed to load crash page:', err));
+            }
+        });
+
+        // Intercept keyboard shortcuts from BrowserView and forward to renderer
+        view.webContents.on('before-input-event', (event, input) => {
+            if (!this.mainWindow || input.type !== 'keyDown') return;
+            const meta = process.platform === 'darwin' ? input.meta : input.control;
+
+            if (meta && !input.shift && !input.alt) {
+                const key = input.key.toLowerCase();
+                if (['k', 'f', 'l', 't', 'w', 'h', 'j', 'b', 'p', '=', '+', '-', '0'].includes(key)) {
+                    event.preventDefault();
+                    this.mainWindow.webContents.send('shortcut:from-browserview', { key, meta: true, shift: false, alt: false });
+                }
+            }
+
+            // Cmd+Alt+I / Ctrl+Shift+I — DevTools
+            if ((input.meta && input.alt && input.key.toLowerCase() === 'i') ||
+                (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+                event.preventDefault();
+                this.openDevToolsForActiveTab();
+            }
+
+            // Escape
+            if (input.key === 'Escape') {
+                this.mainWindow.webContents.send('shortcut:from-browserview', { key: 'escape', meta: false, shift: false, alt: false });
             }
         });
     }
@@ -287,7 +380,6 @@ export class TabManager {
     async createTab(mainWindow: BrowserWindow, url: string, initialState?: { history?: string[], historyIndex?: number, scrollPosition?: { x: number, y: number } }): Promise<string> {
         const tabId = `tab-${randomUUID()}`;
 
-        // Store tab info first
         const tabInfo: Tab = {
             id: tabId,
             url: url,
@@ -295,68 +387,61 @@ export class TabManager {
                 (url === 'neuralweb://settings' ? 'Settings' :
                     (url === 'neuralweb://downloads' ? 'Downloads' :
                         (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url))),
-            view: null as any, // Will be set for non-home pages
+            view: null as any,
             history: initialState?.history || [],
             historyIndex: initialState?.historyIndex || 0,
             scrollPosition: initialState?.scrollPosition,
             pinned: false,
-            muted: false
+            muted: false,
+            suspended: false,
+            lastActiveAt: Date.now(),
         };
 
-        // Handle special neuralweb:// protocol
         if (url.startsWith('neuralweb://')) {
-            // Special case for crash test: treat as regular page so it gets a BrowserView
             if (url !== 'neuralweb://crash') {
                 this.tabs.set(tabId, tabInfo);
                 this.switchTab(mainWindow, tabId);
+                this.sendTabsListChanged();
                 this.saveSession();
                 return tabId;
             }
         }
 
-        // Ensure URL has protocol for regular pages (and crash test)
         const urlString = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('neuralweb://')
             ? url
             : `https://${url}`;
 
-        // Create BrowserView for regular pages
         const view = new BrowserView({
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
-                sandbox: false, // Match main window settings
+                sandbox: false,
             },
         });
 
-        // Add
         mainWindow.addBrowserView(view);
 
-        // Position the view
         const bounds = mainWindow.getContentBounds();
         view.setBounds({
             x: 0,
             y: this.CHROME_HEIGHT,
-            width: bounds.width,
+            width: bounds.width - this.aiSidebarWidth,
             height: bounds.height - this.CHROME_HEIGHT,
         });
 
-        // Setup all event listeners
         this.setupBrowserView(view, tabId);
 
         if (url === 'neuralweb://crash') {
-            // Force crash for testing
             setTimeout(() => {
                 view.webContents.forcefullyCrashRenderer();
             }, 1000);
         } else {
-            // Load URL with error handling
             this.log('Loading URL:', urlString);
             view.webContents.loadURL(urlString).catch((err) => {
                 console.error(`[TabManager] Failed to load URL ${urlString}:`, err);
             });
         }
 
-        // Restore scroll position if available
         if (initialState?.scrollPosition) {
             view.webContents.once('did-finish-load', () => {
                 if (initialState.scrollPosition) {
@@ -365,14 +450,13 @@ export class TabManager {
             });
         }
 
-        // Update tab info with view
         tabInfo.url = urlString;
         tabInfo.title = urlString;
         tabInfo.view = view;
         this.tabs.set(tabId, tabInfo);
 
-        // Set as active and hide others
         this.switchTab(mainWindow, tabId);
+        this.sendTabsListChanged();
         this.saveSession();
 
         return tabId;
@@ -382,16 +466,15 @@ export class TabManager {
         const tab = this.tabs.get(tabId);
         if (!tab) return;
 
-        // Remove BrowserView only if it exists (not for home page)
         if (tab.view) {
             mainWindow.removeBrowserView(tab.view);
-            (tab.view.webContents as any).destroy();
+            if (!tab.view.webContents.isDestroyed()) {
+                (tab.view.webContents as any).destroy();
+            }
         }
 
-        // Remove from tabs
         this.tabs.delete(tabId);
 
-        // If this was the active tab, activate another one
         if (this.activeTabId === tabId) {
             const remainingTabs = Array.from(this.tabs.keys());
             if (remainingTabs.length > 0) {
@@ -400,12 +483,18 @@ export class TabManager {
                 this.activeTabId = null;
             }
         }
+        this.sendTabsListChanged();
         this.saveSession();
     }
 
-    switchTab(mainWindow: BrowserWindow, tabId: string): void {
+    async switchTab(mainWindow: BrowserWindow, tabId: string): Promise<void> {
         const tab = this.tabs.get(tabId);
         if (!tab) return;
+
+        // If tab is suspended, unsuspend it
+        if (tab.suspended) {
+            await this.unsuspendTab(tabId);
+        }
 
         // Hide all views
         this.tabs.forEach((t) => {
@@ -414,21 +503,21 @@ export class TabManager {
             }
         });
 
-        // Show selected view only if it exists (not for home page)
+        // Show selected view
         if (tab.view) {
             mainWindow.addBrowserView(tab.view);
 
-            // Update bounds
             const bounds = mainWindow.getContentBounds();
             tab.view.setBounds({
                 x: 0,
                 y: this.CHROME_HEIGHT,
-                width: bounds.width,
+                width: bounds.width - this.aiSidebarWidth,
                 height: bounds.height - this.CHROME_HEIGHT,
             });
         }
 
         this.activeTabId = tabId;
+        tab.lastActiveAt = Date.now();
         this.saveSession();
     }
 
@@ -436,12 +525,12 @@ export class TabManager {
         const tab = this.tabs.get(tabId);
         if (!tab) return;
 
-        // Handle navigation to internal pages
         if (url.startsWith('neuralweb://')) {
-            // Remove existing view if present
             if (tab.view && this.mainWindow) {
                 this.mainWindow.removeBrowserView(tab.view);
-                (tab.view.webContents as any).destroy();
+                if (!tab.view.webContents.isDestroyed()) {
+                    (tab.view.webContents as any).destroy();
+                }
             }
             tab.view = null as any;
             tab.url = url;
@@ -449,11 +538,9 @@ export class TabManager {
                 (url === 'neuralweb://settings' ? 'Settings' :
                     (url === 'neuralweb://downloads' ? 'Downloads' :
                         (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url)));
+            tab.suspended = false;
 
-            // Notify renderer
-            if (this.mainWindow) {
-                this.mainWindow.webContents.send('tab-updated', this.activeTabId);
-            }
+            this.sendTabUpdate(tabId);
             this.saveSession();
             return;
         }
@@ -462,7 +549,6 @@ export class TabManager {
             ? url
             : `https://${url}`;
 
-        // If navigating from home page, create a new BrowserView
         if (!tab.view && this.mainWindow) {
             const view = new BrowserView({
                 webPreferences: {
@@ -477,13 +563,13 @@ export class TabManager {
             view.setBounds({
                 x: 0,
                 y: this.CHROME_HEIGHT,
-                width: bounds.width,
+                width: bounds.width - this.aiSidebarWidth,
                 height: bounds.height - this.CHROME_HEIGHT,
             });
 
             tab.view = view;
+            tab.suspended = false;
 
-            // Setup all event listeners using centralized method
             this.setupBrowserView(view, tabId);
         }
 
@@ -511,21 +597,20 @@ export class TabManager {
             tab.view.webContents.openDevTools({ mode: 'right', activate: true });
         } else {
             this.log('DevTools already open for this tab');
-            // Focus the DevTools window if already open
             tab.view.webContents.devToolsWebContents?.focus();
         }
     }
 
     goBack(tabId: string): void {
         const tab = this.tabs.get(tabId);
-        if (tab && tab.view.webContents.canGoBack()) {
+        if (tab && tab.view && tab.view.webContents.canGoBack()) {
             tab.view.webContents.goBack();
         }
     }
 
     goForward(tabId: string): void {
         const tab = this.tabs.get(tabId);
-        if (tab && tab.view.webContents.canGoForward()) {
+        if (tab && tab.view && tab.view.webContents.canGoForward()) {
             tab.view.webContents.goForward();
         }
     }
@@ -537,7 +622,7 @@ export class TabManager {
         }
     }
 
-    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; scrollPosition?: { x: number; y: number }; pinned: boolean; muted: boolean }> {
+    getTabs(): Array<{ id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; scrollPosition?: { x: number; y: number }; pinned: boolean; muted: boolean; suspended: boolean }> {
         return Array.from(this.tabs.values()).map(tab => ({
             id: tab.id,
             url: tab.url,
@@ -547,7 +632,8 @@ export class TabManager {
             groupId: tab.groupId,
             scrollPosition: tab.scrollPosition,
             pinned: tab.pinned,
-            muted: tab.muted
+            muted: tab.muted,
+            suspended: tab.suspended,
         }));
     }
 
@@ -582,7 +668,6 @@ export class TabManager {
 
     private async loadVisitCounts() {
         // Load visit counts from disk if persistence is implemented
-        // For now, it's in-memory
     }
 
     recordNavigation(url: string) {
@@ -598,10 +683,9 @@ export class TabManager {
             });
             this.log('Recorded visit for:', domain, 'Count:', current.count + 1);
 
-            // Add to global history
             this.historyManager.addEntry({
                 url: url,
-                title: url, // Initial title is URL
+                title: url,
             });
             this.saveSession();
         } catch (e) {
@@ -624,7 +708,6 @@ export class TabManager {
                 });
             }
 
-            // Update global history
             this.historyManager.updateLastEntry(url, metadata);
             this.saveSession();
         } catch (e) {
@@ -641,19 +724,30 @@ export class TabManager {
                 let name = domain.replace(/^https?:\/\/(www\.)?/, '');
                 name = name.charAt(0).toUpperCase() + name.slice(1);
 
-                // Use Google's favicon service as fallback if no local favicon
                 const fallbackFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
 
                 return {
                     name: data.title || name,
                     url: domain,
-                    icon: '🌐', // Fallback emoji
+                    icon: '🌐',
                     color: '#333333',
                     favicon: data.favicon || fallbackFavicon
                 };
             });
 
         return sortedSites;
+    }
+
+    setOverlayActive(active: boolean): void {
+        this.overlayActive = active;
+        this.setTabVisibility(!active);
+    }
+
+    setAiSidebarOpen(open: boolean): void {
+        this.aiSidebarWidth = open ? 400 : 0;
+        if (this.mainWindow) {
+            this.repositionViews(this.mainWindow);
+        }
     }
 
     repositionViews(mainWindow: BrowserWindow): void {
@@ -663,7 +757,7 @@ export class TabManager {
                 tab.view.setBounds({
                     x: 0,
                     y: this.CHROME_HEIGHT,
-                    width: bounds.width,
+                    width: bounds.width - this.aiSidebarWidth,
                     height: bounds.height - this.CHROME_HEIGHT,
                 });
             }
@@ -734,10 +828,7 @@ export class TabManager {
 
         tab.groupId = groupId;
         this.saveSession();
-
-        if (this.mainWindow) {
-            this.mainWindow.webContents.send('tab-updated');
-        }
+        this.sendTabUpdate(tabId);
         return true;
     }
 
@@ -748,10 +839,7 @@ export class TabManager {
 
         tab.groupId = undefined;
         this.saveSession();
-
-        if (this.mainWindow) {
-            this.mainWindow.webContents.send('tab-updated');
-        }
+        this.sendTabUpdate(tabId);
         return true;
     }
 
@@ -760,7 +848,6 @@ export class TabManager {
     }
 
     deleteGroup(groupId: string): boolean {
-        // Remove groupId from all tabs in this group
         this.tabs.forEach(tab => {
             if (tab.groupId === groupId) {
                 tab.groupId = undefined;
@@ -785,7 +872,7 @@ export class TabManager {
                 tab.view.setBounds({
                     x: 0,
                     y: this.CHROME_HEIGHT,
-                    width: bounds.width,
+                    width: bounds.width - this.aiSidebarWidth,
                     height: bounds.height - this.CHROME_HEIGHT,
                 });
             } else {
@@ -807,9 +894,7 @@ export class TabManager {
 
         tab.pinned = !tab.pinned;
         this.saveSession();
-        if (this.mainWindow) {
-            this.mainWindow.webContents.send('tab-updated');
-        }
+        this.sendTabUpdate(tabId);
         return tab.pinned;
     }
 
@@ -821,9 +906,7 @@ export class TabManager {
         tab.view.webContents.setAudioMuted(tab.muted);
 
         this.saveSession();
-        if (this.mainWindow) {
-            this.mainWindow.webContents.send('tab-updated');
-        }
+        this.sendTabUpdate(tabId);
         return tab.muted;
     }
 

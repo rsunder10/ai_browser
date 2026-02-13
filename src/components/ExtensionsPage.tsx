@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Puzzle, Trash2, Plus, AlertCircle } from 'lucide-react';
+import { Puzzle, Trash2, Plus, AlertCircle, Shield, FileCode } from 'lucide-react';
 import './ExtensionsPage.css';
+
+interface ExtensionManifest {
+    permissions?: string[];
+    content_scripts?: Array<{ matches: string[]; js?: string[]; css?: string[] }>;
+}
 
 interface Extension {
     id: string;
@@ -9,6 +14,8 @@ interface Extension {
     description?: string;
     enabled: boolean;
     path: string;
+    manifest?: ExtensionManifest;
+    hasAction: boolean;
 }
 
 export const ExtensionsPage: React.FC = () => {
@@ -107,9 +114,39 @@ export const ExtensionsPage: React.FC = () => {
                                 <div className="extension-info">
                                     <h3>{ext.name}</h3>
                                     <span className="version">v{ext.version}</span>
+                                    {ext.description && (
+                                        <p className="ext-description">{ext.description}</p>
+                                    )}
                                     <p className="path">{ext.path}</p>
+
+                                    {ext.manifest?.permissions && ext.manifest.permissions.length > 0 && (
+                                        <div className="ext-detail">
+                                            <Shield size={12} />
+                                            <span>Permissions: {ext.manifest.permissions.join(', ')}</span>
+                                        </div>
+                                    )}
+
+                                    {ext.manifest?.content_scripts && ext.manifest.content_scripts.length > 0 && (
+                                        <div className="ext-detail">
+                                            <FileCode size={12} />
+                                            <span>Content scripts: {ext.manifest.content_scripts.map(cs => cs.matches.join(', ')).join('; ')}</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="extension-actions">
+                                    <label className="ext-toggle" title={ext.enabled ? 'Enabled' : 'Disabled'}>
+                                        <input
+                                            type="checkbox"
+                                            checked={ext.enabled}
+                                            onChange={() => {
+                                                // Toggle is mainly visual for now
+                                                setExtensions(prev => prev.map(e =>
+                                                    e.name === ext.name ? { ...e, enabled: !e.enabled } : e
+                                                ));
+                                            }}
+                                        />
+                                        <span className="ext-toggle-slider" />
+                                    </label>
                                     <button
                                         className="remove-button"
                                         onClick={() => handleRemove(ext.name)}

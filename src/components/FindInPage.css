@@ -1,7 +1,7 @@
 .find-in-page {
     position: absolute;
-    top: 80px;
-    /* Below chrome */
+    top: 46px;
+    /* Within the chrome toolbar area, above BrowserView */
     right: 20px;
     background: white;
     padding: 4px;

@@ -1,6 +1,7 @@
 
 import { app, BrowserWindow, BrowserView, ipcMain, Menu, MenuItem, dialog } from 'electron';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { TabManager } from './TabManager';
 
 import { BookmarksManager } from './managers/BookmarksManager';
@@ -15,6 +16,7 @@ import { AIManager } from './managers/AIManager';
 import { ReaderManager } from './managers/ReaderManager';
 import { AdBlockerManager } from './managers/AdBlockerManager';
 import { OllamaManager } from './managers/OllamaManager';
+import { SyncManager } from './managers/SyncManager';
 
 // ... existing imports
 
@@ -45,6 +47,16 @@ const sessionManager = new SessionManager();
 const ollamaManager = new OllamaManager();
 const aiManager = new AIManager(ollamaManager, settingsManager);
 const readerManager = new ReaderManager();
+const syncManager = new SyncManager(bookmarksManager, historyManager, settingsManager);
+
+// Permission request handling
+interface PendingPermission {
+    callback: (granted: boolean) => void;
+    origin: string;
+    permission: string;
+    timeout: NodeJS.Timeout;
+}
+const pendingPermissionRequests = new Map<string, PendingPermission>();
 
 function getTabManager(event: Electron.IpcMainInvokeEvent): TabManager | null {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -82,10 +94,16 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
     // Update download manager to track this window (simplified for now, might need better multi-window handling)
     downloadManager.setMainWindow(window);
 
-    // Handle permissions
+    // Handle permissions with prompt UI
     window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
         const url = webContents.getURL();
-        const origin = new URL(url).origin;
+        let origin: string;
+        try {
+            origin = new URL(url).origin;
+        } catch {
+            callback(false);
+            return;
+        }
         const storedPermission = permissionsManager.getPermission(origin, permission);
 
         if (storedPermission === 'allow') {
@@ -93,12 +111,20 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
         } else if (storedPermission === 'deny') {
             callback(false);
         } else {
-            // For now, auto-approve to avoid blocking, but in real app we'd show a prompt
-            // TODO: Implement permission prompt UI
-            if (permission !== 'openExternal') {
-                console.log(`Permission requested: ${permission} for ${origin}`);
-            }
-            callback(true);
+            // Show permission prompt in renderer
+            const requestId = randomUUID();
+
+            // Auto-deny after 60 seconds
+            const timeout = setTimeout(() => {
+                const pending = pendingPermissionRequests.get(requestId);
+                if (pending) {
+                    pending.callback(false);
+                    pendingPermissionRequests.delete(requestId);
+                }
+            }, 60_000);
+
+            pendingPermissionRequests.set(requestId, { callback, origin, permission, timeout });
+            window.webContents.send('permission:request', { requestId, origin, permission });
         }
     });
 
@@ -558,9 +584,12 @@ ipcMain.handle('print:page', async (event) => {
 });
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     // Start Ollama sidecar in background (does not block window creation)
     ollamaManager.start().catch(err => console.error('[Main] Ollama start failed:', err));
+
+    // Load extensions from saved paths
+    await extensionsManager.loadExtensions();
 
     const lastSession = sessionManager.getLastSession();
     const windowIds = Object.keys(lastSession.windows).map(Number);
@@ -582,6 +611,12 @@ ipcMain.handle('session:clear', async () => {
 });
 
 app.on('before-quit', () => {
+    // Flush all pending writes synchronously
+    historyManager.flushSync();
+    sessionManager.flushSync();
+    permissionsManager.flushSync();
+    bookmarksManager.flushSync();
+
     ollamaManager.stop().catch(err => console.error('[Main] Ollama stop failed:', err));
 });
 
@@ -627,6 +662,42 @@ ipcMain.handle('permissions:set', async (event, { origin, permission, status }) 
 ipcMain.handle('permissions:clear', async (event, origin) => {
     permissionsManager.clearPermissionsForOrigin(origin);
     return true;
+});
+
+// Permission prompt response handler
+ipcMain.handle('permission:respond', async (event, { requestId, allowed, remember }) => {
+    const pending = pendingPermissionRequests.get(requestId);
+    if (!pending) return;
+
+    clearTimeout(pending.timeout);
+    pending.callback(allowed);
+    pendingPermissionRequests.delete(requestId);
+
+    if (remember) {
+        permissionsManager.setPermission(pending.origin, pending.permission, allowed ? 'allow' : 'deny');
+    }
+});
+
+// Extensions IPC
+ipcMain.handle('extensions:get', async () => {
+    return extensionsManager.getExtensions();
+});
+
+ipcMain.handle('extensions:install', async (event, extensionPath: string) => {
+    return extensionsManager.installExtension(extensionPath);
+});
+
+ipcMain.handle('extensions:remove', async (event, name: string) => {
+    return extensionsManager.removeExtension(name);
+});
+
+ipcMain.handle('extensions:get-actions', async () => {
+    return extensionsManager.getExtensionActions();
+});
+
+ipcMain.handle('extensions:action-click', async (event, name: string) => {
+    // For now, just log - real implementation would open extension popup
+    console.log('[Extensions] Action clicked:', name);
 });
 
 // AI IPC
@@ -679,8 +750,6 @@ ipcMain.handle('reader:toggle', async (event) => {
     const tm = getTabManager(event);
     if (!tm) return false;
 
-    // We need the WebContents of the *active tab*, not the main window
-    // The TabManager manages BrowserViews. We need to get the active BrowserView.
     const activeTabId = tm.getActiveTabId();
     if (!activeTabId) return false;
 
@@ -744,7 +813,7 @@ ipcMain.handle('tabs:show-context-menu', async (event, tabId: string, hasGroup: 
     const menu = new Menu();
     const tab = (await tm.getTabs()).find(t => t.id === tabId);
     const isPinned = tab?.pinned || false;
-    const isMuted = tab?.muted || false; // Note: getTabs() return type doesn't have muted yet in main.ts view, but runtime it does
+    const isMuted = tab?.muted || false;
 
     // Standard Tab Actions
     menu.append(new MenuItem({
@@ -837,5 +906,57 @@ ipcMain.handle('tabs:set-visibility', async (event, visible: boolean) => {
     tm.setTabVisibility(visible);
 });
 
+ipcMain.handle('ai:sidebar-toggle', async (event, open: boolean) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.setAiSidebarOpen(open);
+});
 
+ipcMain.handle('overlay:set-active', async (event, active: boolean) => {
+    const tm = getTabManager(event);
+    if (!tm) return;
+    tm.setOverlayActive(active);
+});
 
+// Sync IPC
+ipcMain.handle('sync:export', async (event, options: { bookmarks: boolean; history: boolean; settings: boolean }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false };
+
+    const result = await dialog.showSaveDialog(win, {
+        title: 'Export Browser Data',
+        defaultPath: `neuralweb-export-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+
+    if (result.canceled || !result.filePath) return { success: false };
+
+    try {
+        await syncManager.exportToFile(result.filePath, options);
+        return { success: true, path: result.filePath };
+    } catch (error) {
+        console.error('[Sync] Export failed:', error);
+        return { success: false };
+    }
+});
+
+ipcMain.handle('sync:import', async (event, { strategy }: { strategy: 'merge' | 'replace' }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { success: false };
+
+    const result = await dialog.showOpenDialog(win, {
+        title: 'Import Browser Data',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return { success: false };
+
+    try {
+        const summary = await syncManager.importFromFile(result.filePaths[0], strategy);
+        return { success: true, summary };
+    } catch (error) {
+        console.error('[Sync] Import failed:', error);
+        return { success: false };
+    }
+});

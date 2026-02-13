@@ -29,11 +29,21 @@ export class PermissionsManager {
         }
     }
 
-    private savePermissions() {
+    private async savePermissions() {
+        const tmpPath = this.permissionsPath + '.tmp';
+        try {
+            await fs.promises.writeFile(tmpPath, JSON.stringify(this.permissions, null, 2));
+            await fs.promises.rename(tmpPath, this.permissionsPath);
+        } catch (error) {
+            console.error('Failed to save permissions:', error);
+        }
+    }
+
+    flushSync(): void {
         try {
             fs.writeFileSync(this.permissionsPath, JSON.stringify(this.permissions, null, 2));
         } catch (error) {
-            console.error('Failed to save permissions:', error);
+            console.error('Failed to flush permissions:', error);
         }
     }
 

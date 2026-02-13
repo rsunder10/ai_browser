@@ -1,0 +1,152 @@
+.omnibar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    padding-top: 15vh;
+}
+
+.omnibar-panel {
+    width: 100%;
+    max-width: 600px;
+    max-height: 480px;
+    background: #1e1e2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: fit-content;
+}
+
+.omnibar-input-container {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a2a4a;
+    gap: 10px;
+}
+
+.omnibar-input-container svg {
+    color: #666;
+    flex-shrink: 0;
+}
+
+.omnibar-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 15px;
+    outline: none;
+}
+
+.omnibar-input::placeholder {
+    color: #555;
+}
+
+.omnibar-results {
+    overflow-y: auto;
+    max-height: 380px;
+    padding: 4px 0;
+}
+
+.omnibar-category {
+    padding: 6px 16px 2px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+}
+
+.omnibar-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.omnibar-item:hover,
+.omnibar-item.selected {
+    background: #2a2a4a;
+}
+
+.omnibar-item-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #2a2a4a;
+    color: #7c8aff;
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
+.omnibar-item.selected .omnibar-item-icon {
+    background: #3a3a5a;
+}
+
+.omnibar-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.omnibar-item-title {
+    font-size: 13px;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.omnibar-item-subtitle {
+    font-size: 11px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.omnibar-item-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #2a2a4a;
+    color: #888;
+    flex-shrink: 0;
+}
+
+.omnibar-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #555;
+    font-size: 13px;
+}
+
+.omnibar-hint {
+    padding: 8px 16px;
+    border-top: 1px solid #2a2a4a;
+    font-size: 11px;
+    color: #555;
+    display: flex;
+    gap: 12px;
+}
+
+.omnibar-hint kbd {
+    background: #2a2a4a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 10px;
+}

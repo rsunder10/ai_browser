@@ -5,7 +5,7 @@ import NavigationControls from './NavigationControls';
 import AddressBar from './AddressBar';
 import BookmarksBar from './BookmarksBar';
 import BrowserMenu from './BrowserMenu';
-import { Download, Book, EyeOff } from 'lucide-react';
+import { Download, Book, EyeOff, Puzzle, Sparkles } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -14,6 +14,12 @@ interface Tab {
     history: string[];
     history_index: number;
     groupId?: string;
+}
+
+interface ExtensionAction {
+    name: string;
+    icon?: string;
+    title?: string;
 }
 
 interface BrowserChromeProps {
@@ -27,6 +33,8 @@ interface BrowserChromeProps {
     onForward: () => void;
     onRefresh: () => void;
     onHome: () => void;
+    onAIToggle?: () => void;
+    aiSidebarOpen?: boolean;
 }
 
 export default function BrowserChrome({
@@ -39,7 +47,9 @@ export default function BrowserChrome({
     onBack,
     onForward,
     onRefresh,
-    onHome
+    onHome,
+    onAIToggle,
+    aiSidebarOpen
 }: BrowserChromeProps) {
     const activeTab = tabs.find(t => t.id === activeTabId);
     const canGoBack = activeTab ? activeTab.history_index > 0 : false;
@@ -47,10 +57,12 @@ export default function BrowserChrome({
     const currentUrl = activeTab?.url || '';
 
     const [isIncognito, setIsIncognito] = useState(false);
+    const [extensionActions, setExtensionActions] = useState<ExtensionAction[]>([]);
 
     useEffect(() => {
         if (window.electron) {
             window.electron.invoke('is-incognito').then(setIsIncognito);
+            window.electron.invoke('extensions:get-actions').then(setExtensionActions).catch(() => {});
         }
     }, []);
 
@@ -83,6 +95,27 @@ export default function BrowserChrome({
                         <EyeOff size={16} />
                         <span>Incognito</span>
                     </div>
+                )}
+
+                {extensionActions.map(ext => (
+                    <button
+                        key={ext.name}
+                        className="settings-btn"
+                        onClick={() => window.electron.invoke('extensions:action-click', ext.name)}
+                        title={ext.title || ext.name}
+                    >
+                        <Puzzle size={16} />
+                    </button>
+                ))}
+
+                {onAIToggle && (
+                    <button
+                        className={`settings-btn ${aiSidebarOpen ? 'active' : ''}`}
+                        onClick={onAIToggle}
+                        title="AI Assistant"
+                    >
+                        <Sparkles size={18} />
+                    </button>
                 )}
                 <button
                     className="settings-btn"

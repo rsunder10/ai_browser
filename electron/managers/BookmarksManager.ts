@@ -140,4 +140,64 @@ export class BookmarksManager {
         }
         return null;
     }
+
+    private collectUrls(node: BookmarkNode): Set<string> {
+        const urls = new Set<string>();
+        if (node.url) urls.add(node.url);
+        if (node.children) {
+            for (const child of node.children) {
+                for (const url of this.collectUrls(child)) {
+                    urls.add(url);
+                }
+            }
+        }
+        return urls;
+    }
+
+    mergeBookmarks(importedTree: BookmarkNode[]): number {
+        const data = this.store.getAll();
+        const existingUrls = new Set<string>();
+        for (const url of this.collectUrls(data.roots.bookmark_bar)) existingUrls.add(url);
+        for (const url of this.collectUrls(data.roots.other)) existingUrls.add(url);
+
+        let added = 0;
+        const addNewBookmarks = (sourceNode: BookmarkNode, targetNode: BookmarkNode) => {
+            if (!sourceNode.children) return;
+            if (!targetNode.children) targetNode.children = [];
+            for (const child of sourceNode.children) {
+                if (child.url) {
+                    if (!existingUrls.has(child.url)) {
+                        targetNode.children.push({ ...child, id: uuidv4() });
+                        existingUrls.add(child.url);
+                        added++;
+                    }
+                } else if (child.children) {
+                    // It's a folder - find or create matching folder
+                    let targetFolder = targetNode.children.find(c => !c.url && c.title === child.title);
+                    if (!targetFolder) {
+                        targetFolder = { ...child, id: uuidv4(), children: [] };
+                        targetNode.children.push(targetFolder);
+                    }
+                    addNewBookmarks(child, targetFolder);
+                }
+            }
+        };
+
+        if (importedTree[0]) addNewBookmarks(importedTree[0], data.roots.bookmark_bar);
+        if (importedTree[1]) addNewBookmarks(importedTree[1], data.roots.other);
+
+        this.store.setAll(data);
+        return added;
+    }
+
+    setTree(tree: BookmarkNode[]): void {
+        const data = this.store.getAll();
+        if (tree[0]) data.roots.bookmark_bar = tree[0];
+        if (tree[1]) data.roots.other = tree[1];
+        this.store.setAll(data);
+    }
+
+    flushSync(): void {
+        this.store.flushSync();
+    }
 }

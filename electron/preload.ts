@@ -17,11 +17,14 @@ contextBridge.exposeInMainWorld('electron', {
             'extensions:get',
             'extensions:install',
             'extensions:remove',
+            'extensions:get-actions',
+            'extensions:action-click',
             'passwords:save',
             'passwords:get',
             'permissions:get-all',
             'permissions:set',
             'permissions:clear',
+            'permission:respond',
             'bookmarks:get',
             'bookmarks:add',
             'bookmarks:remove',
@@ -69,6 +72,11 @@ contextBridge.exposeInMainWorld('electron', {
             'tabs:delete-group',
             'tabs:show-context-menu',
             'tabs:set-visibility',
+            'session:clear',
+            'ai:sidebar-toggle',
+            'overlay:set-active',
+            'sync:export',
+            'sync:import',
         ];
 
         if (validChannels.includes(channel)) {
@@ -76,14 +84,34 @@ contextBridge.exposeInMainWorld('electron', {
         }
     },
     on: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog', 'ai:stream-chunk', 'ai:stream-end', 'ai:open-sidebar'];
+        const validChannels = [
+            'tab-updated',
+            'tabs:list-changed',
+            'trigger-find',
+            'show-create-group-dialog',
+            'ai:stream-chunk',
+            'ai:stream-end',
+            'ai:open-sidebar',
+            'permission:request',
+            'shortcut:from-browserview',
+        ];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (_event, ...args) => callback(...args));
         }
     },
     removeListener: (channel: string, callback: (...args: any[]) => void) => {
-        const validChannels = ['tab-updated', 'trigger-find', 'show-create-group-dialog', 'ai:stream-chunk', 'ai:stream-end', 'ai:open-sidebar'];
+        const validChannels = [
+            'tab-updated',
+            'tabs:list-changed',
+            'trigger-find',
+            'show-create-group-dialog',
+            'ai:stream-chunk',
+            'ai:stream-end',
+            'ai:open-sidebar',
+            'permission:request',
+            'shortcut:from-browserview',
+        ];
 
         if (validChannels.includes(channel)) {
             ipcRenderer.removeListener(channel, callback);
@@ -108,7 +136,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                     passwordInput.value = password;
 
                     // Find preceding text/email input for username
-                    // Simple heuristic: look at previous siblings or inputs in the same form
                     const form = passwordInput.form;
                     if (form) {
                         const inputs = Array.from(form.querySelectorAll('input'));

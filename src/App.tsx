@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import BrowserChrome from './components/BrowserChrome';
 import AISidebar from './components/AISidebar';
@@ -8,6 +8,8 @@ import BookmarksPage from './components/BookmarksPage';
 import DownloadsPage from './components/DownloadsPage';
 import HistoryPage from './components/HistoryPage';
 import FindInPage from './components/FindInPage';
+import PermissionPrompt from './components/PermissionPrompt';
+import Omnibar from './components/Omnibar';
 import { SiteSettingsPage } from './components/SiteSettingsPage';
 
 interface Tab {
@@ -19,6 +21,7 @@ interface Tab {
   groupId?: string;
   pinned?: boolean;
   muted?: boolean;
+  suspended?: boolean;
 }
 
 function App() {
@@ -26,6 +29,7 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [showFindInPage, setShowFindInPage] = useState(false);
+  const [showOmnibar, setShowOmnibar] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
   const [pendingExplainText, setPendingExplainText] = useState<string | null>(null);
   const initialized = useRef(false);
@@ -61,15 +65,93 @@ function App() {
     });
   }, []);
 
+  // Omnibar helpers that toggle BrowserView visibility
+  const openOmnibar = useCallback(() => {
+    setShowOmnibar(true);
+    window.electron?.invoke('overlay:set-active', true);
+  }, []);
+
+  const closeOmnibar = useCallback(() => {
+    setShowOmnibar(false);
+    window.electron?.invoke('overlay:set-active', false);
+  }, []);
+
+  const toggleOmnibar = useCallback(() => {
+    setShowOmnibar(prev => {
+      const next = !prev;
+      window.electron?.invoke('overlay:set-active', next);
+      return next;
+    });
+  }, []);
+
+  // Shared shortcut handler used by both keydown and BrowserView forwarding
+  const executeShortcut = useCallback((key: string) => {
+    switch (key) {
+      case 'k': toggleOmnibar(); break;
+      case 'f': setShowFindInPage(true); break;
+      case 't': handleNewTab(); break;
+      case 'w': {
+        // Close active tab — read latest activeTabId from DOM state
+        window.electron?.invoke('get-active-tab').then((id: string | null) => {
+          if (id) handleTabClose(id);
+        });
+        break;
+      }
+      case 'l': {
+        // Focus address bar — dispatch a custom event the AddressBar can listen for
+        const addressBar = document.querySelector('.address-input') as HTMLInputElement | null;
+        addressBar?.focus();
+        addressBar?.select();
+        break;
+      }
+      case 'h': handleNavigate('neuralweb://history'); break;
+      case 'j': handleNavigate('neuralweb://downloads'); break;
+      case 'b': handleNavigate('neuralweb://bookmarks'); break;
+      case 'p': window.electron?.invoke('print:page'); break;
+      case '=':
+      case '+':
+        window.electron?.invoke('zoom:get').then((level: number) => {
+          window.electron?.invoke('zoom:set', level + 0.5);
+        });
+        break;
+      case '-':
+        window.electron?.invoke('zoom:get').then((level: number) => {
+          window.electron?.invoke('zoom:set', level - 0.5);
+        });
+        break;
+      case '0': window.electron?.invoke('zoom:reset'); break;
+      case 'escape':
+        closeOmnibar();
+        setShowFindInPage(false);
+        break;
+    }
+  }, [toggleOmnibar, closeOmnibar]);
+
   // Listen for tab updates from Electron
   useEffect(() => {
     if (!window.electron) return;
 
-    const handleTabUpdate = () => {
+    // Incremental tab update: patch single tab in state
+    const handleTabUpdate = (data: any) => {
+      if (data && data.id) {
+        setTabs(prev => prev.map(t =>
+          t.id === data.id
+            ? { ...t, url: data.url, title: data.title, history: data.history, history_index: data.historyIndex, groupId: data.groupId, pinned: data.pinned, muted: data.muted, suspended: data.suspended }
+            : t
+        ));
+      } else {
+        // Fallback: full reload if no data payload
+        loadTabs();
+      }
+    };
+
+    // Structural change: full reload
+    const handleTabsListChanged = () => {
       loadTabs();
     };
 
     window.electron.on('tab-updated', handleTabUpdate);
+    window.electron.on('tabs:list-changed', handleTabsListChanged);
 
     // Listen for find trigger from menu
     const handleTriggerFind = () => {
@@ -81,50 +163,27 @@ function App() {
     const handleOpenSidebar = (data: { text: string; action: string }) => {
       setAiSidebarOpen(true);
       setPendingExplainText(data.text);
+      window.electron?.invoke('ai:sidebar-toggle', true);
     };
     window.electron.on('ai:open-sidebar', handleOpenSidebar);
 
-    // Keyboard shortcuts
+    // Listen for forwarded shortcuts from BrowserView
+    const handleBrowserViewShortcut = (data: { key: string }) => {
+      executeShortcut(data.key);
+    };
+    window.electron.on('shortcut:from-browserview', handleBrowserViewShortcut);
+
+    // Keyboard shortcuts (fires when renderer has focus)
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
-        e.preventDefault();
-        handleNewTab();
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (['k', 'f', 'l', 't', 'w', 'h', 'j', 'b', 'p', '=', '+', '-', '0'].includes(key)) {
+          e.preventDefault();
+          executeShortcut(key);
+        }
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault();
-        setShowFindInPage(true);
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
-        e.preventDefault();
-        handleNavigate('neuralweb://history');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
-        e.preventDefault();
-        handleNavigate('neuralweb://downloads');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
-        e.preventDefault();
-        handleNavigate('neuralweb://bookmarks');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault();
-        window.electron.invoke('print:page');
-      }
-      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        window.electron.invoke('zoom:get').then((level: number) => {
-          window.electron.invoke('zoom:set', level + 0.5);
-        });
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
-        e.preventDefault();
-        window.electron.invoke('zoom:get').then((level: number) => {
-          window.electron.invoke('zoom:set', level - 0.5);
-        });
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-        e.preventDefault();
-        window.electron.invoke('zoom:reset');
+      if (e.key === 'Escape') {
+        executeShortcut('escape');
       }
     };
 
@@ -133,12 +192,14 @@ function App() {
     return () => {
       if (window.electron) {
         window.electron.removeListener('tab-updated', handleTabUpdate);
+        window.electron.removeListener('tabs:list-changed', handleTabsListChanged);
         window.electron.removeListener('trigger-find', handleTriggerFind);
         window.electron.removeListener('ai:open-sidebar', handleOpenSidebar);
+        window.electron.removeListener('shortcut:from-browserview', handleBrowserViewShortcut);
       }
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [executeShortcut]);
 
   const loadTabs = async () => {
     try {
@@ -303,7 +364,16 @@ function App() {
         onForward={handleForward}
         onRefresh={handleRefresh}
         onHome={handleHome}
+        onAIToggle={() => {
+          const newState = !aiSidebarOpen;
+          setAiSidebarOpen(newState);
+          window.electron?.invoke('ai:sidebar-toggle', newState);
+        }}
+        aiSidebarOpen={aiSidebarOpen}
       />
+
+      <PermissionPrompt />
+
       <div className="content-area">
         {isHomePage && <HomePage onNavigate={handleNavigate} />}
         {isSettingsPage && <SettingsPage />}
@@ -320,7 +390,11 @@ function App() {
 
       <AISidebar
         isOpen={aiSidebarOpen}
-        onToggle={() => setAiSidebarOpen(!aiSidebarOpen)}
+        onToggle={() => {
+          const newState = !aiSidebarOpen;
+          setAiSidebarOpen(newState);
+          window.electron?.invoke('ai:sidebar-toggle', newState);
+        }}
         currentUrl={currentUrl}
         pendingExplainText={pendingExplainText}
         onExplainConsumed={() => setPendingExplainText(null)}
@@ -328,6 +402,22 @@ function App() {
 
       {showFindInPage && (
         <FindInPage onClose={() => setShowFindInPage(false)} />
+      )}
+
+      {showOmnibar && (
+        <Omnibar
+          tabs={tabs}
+          onTabClick={(tabId) => { closeOmnibar(); handleTabClick(tabId); }}
+          onNavigate={(url) => { closeOmnibar(); handleNavigate(url); }}
+          onNewTab={() => { closeOmnibar(); handleNewTab(); }}
+          onToggleAI={() => {
+            closeOmnibar();
+            const newState = !aiSidebarOpen;
+            setAiSidebarOpen(newState);
+            window.electron?.invoke('ai:sidebar-toggle', newState);
+          }}
+          onClose={closeOmnibar}
+        />
       )}
 
       <div className="status-bar">
