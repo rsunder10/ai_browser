@@ -89,6 +89,101 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
     tabManager.setOnExplainText((text) => {
         window.webContents.send('ai:open-sidebar', { text, action: 'explain' });
     });
+    tabManager.setOnTranslateRequest(async (tabId, targetLang) => {
+        try {
+            const content = await tabManager.getTabContent(tabId);
+            if (!content || !content.text) {
+                window.webContents.send('ai:translation-error', { error: 'Could not extract page content.' });
+                return;
+            }
+
+            // Extract text nodes via executeJavaScript
+            const tab = tabManager.getTab(tabId);
+            if (!tab || !tab.webContents || tab.webContents.isDestroyed()) {
+                window.webContents.send('ai:translation-error', { error: 'Tab is not available.' });
+                return;
+            }
+
+            // Get text elements from the page
+            const textElements: string[] = await tab.webContents.executeJavaScript(`
+                (function() {
+                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                        acceptNode: function(node) {
+                            const text = node.textContent.trim();
+                            if (!text || text.length < 2) return NodeFilter.FILTER_REJECT;
+                            const parent = node.parentElement;
+                            if (!parent) return NodeFilter.FILTER_REJECT;
+                            const tag = parent.tagName.toLowerCase();
+                            if (['script', 'style', 'noscript', 'code', 'pre'].includes(tag)) return NodeFilter.FILTER_REJECT;
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                    });
+                    const texts = [];
+                    let node;
+                    while ((node = walker.nextNode()) && texts.length < 200) {
+                        texts.push(node.textContent.trim());
+                    }
+                    return texts;
+                })()
+            `);
+
+            if (!textElements || textElements.length === 0) {
+                window.webContents.send('ai:translation-error', { error: 'No text found to translate.' });
+                return;
+            }
+
+            // Batch texts into chunks to avoid overwhelming the model
+            const BATCH_SIZE = 30;
+            for (let i = 0; i < textElements.length; i += BATCH_SIZE) {
+                const batch = textElements.slice(i, i + BATCH_SIZE);
+                const numberedInput = batch.map((t, j) => `[${i + j}] ${t}`).join('\n');
+
+                const translated = await aiManager.translateText(numberedInput, targetLang);
+
+                // Parse translated output and inject back
+                const translations: { [key: number]: string } = {};
+                const lines = translated.split('\n');
+                for (const line of lines) {
+                    const match = line.match(/^\[(\d+)\]\s*(.+)$/);
+                    if (match) {
+                        translations[parseInt(match[1])] = match[2];
+                    }
+                }
+
+                // Inject translations back into the page
+                await tab.webContents.executeJavaScript(`
+                    (function() {
+                        const translations = ${JSON.stringify(translations)};
+                        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                            acceptNode: function(node) {
+                                const text = node.textContent.trim();
+                                if (!text || text.length < 2) return NodeFilter.FILTER_REJECT;
+                                const parent = node.parentElement;
+                                if (!parent) return NodeFilter.FILTER_REJECT;
+                                const tag = parent.tagName.toLowerCase();
+                                if (['script', 'style', 'noscript', 'code', 'pre'].includes(tag)) return NodeFilter.FILTER_REJECT;
+                                return NodeFilter.FILTER_ACCEPT;
+                            }
+                        });
+                        let idx = 0;
+                        let node;
+                        while ((node = walker.nextNode())) {
+                            if (translations[idx] !== undefined) {
+                                node.textContent = translations[idx];
+                            }
+                            idx++;
+                            if (idx > ${i + BATCH_SIZE - 1}) break;
+                        }
+                    })()
+                `);
+            }
+
+            window.webContents.send('ai:translation-complete', { lang: targetLang });
+        } catch (err: any) {
+            console.error('[Main] Translation error:', err.message);
+            window.webContents.send('ai:translation-error', { error: 'Translation failed: ' + err.message });
+        }
+    });
     tabManagers.set(windowId, tabManager);
 
     // Update download manager to track this window (simplified for now, might need better multi-window handling)
@@ -705,10 +800,26 @@ ipcMain.handle('ai_query', async (event, { provider, prompt }) => {
     return aiManager.processQuery(provider, prompt);
 });
 
-ipcMain.handle('ai:chat-stream', async (event, { messages, requestId }) => {
+ipcMain.handle('ai:chat-stream', async (event, { messages, requestId, skipPageContext }) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
-    await aiManager.processQueryStream(win.webContents, requestId, messages);
+
+    let contextMessages = messages;
+    if (!skipPageContext) {
+        const tm = getTabManager(event);
+        if (tm) {
+            const content = await tm.getActiveTabContent();
+            if (content && content.text && !content.url.startsWith('neuralweb://')) {
+                const pageContext = {
+                    role: 'system',
+                    content: `The user is currently viewing this web page:\nTitle: ${content.title}\nURL: ${content.url}\n\nPage content (excerpt):\n${content.text}\n\nUse this context to answer the user's questions when relevant.`,
+                };
+                contextMessages = [pageContext, ...messages];
+            }
+        }
+    }
+
+    await aiManager.processQueryStream(win.webContents, requestId, contextMessages);
 });
 
 ipcMain.handle('ai:summarize', async (event, { requestId }) => {
@@ -725,6 +836,42 @@ ipcMain.handle('ai:summarize', async (event, { requestId }) => {
     const messages = [
         { role: 'user', content: `Please summarize the following web page.\n\nTitle: ${content.title}\nURL: ${content.url}\n\nContent:\n${content.text}` },
     ];
+    await aiManager.processQueryStream(win.webContents, requestId, messages);
+});
+
+ipcMain.handle('ai:organize-tabs', async (event) => {
+    const tm = getTabManager(event);
+    if (!tm) return [];
+
+    const tabs = tm.getTabs()
+        .filter(t => !t.url.startsWith('neuralweb://'))
+        .map(t => ({ id: t.id, title: t.title, url: t.url }));
+
+    if (tabs.length < 2) return [];
+
+    return aiManager.suggestTabGroups(tabs);
+});
+
+ipcMain.handle('ai:multi-tab-stream', async (event, { tabIds, prompt, requestId }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const tm = getTabManager(event);
+    if (!win || !tm) return;
+
+    const contents = await tm.getMultiTabContent(tabIds);
+    if (contents.length === 0) {
+        win.webContents.send('ai:stream-end', { requestId, error: 'Could not extract content from selected tabs.' });
+        return;
+    }
+
+    const tabSections = contents.map((c, i) =>
+        `--- Tab ${i + 1}: ${c.title} ---\nURL: ${c.url}\n\n${c.text}`
+    ).join('\n\n');
+
+    const messages = [
+        { role: 'system', content: `The user has selected ${contents.length} browser tabs. Here is the content from each:\n\n${tabSections}` },
+        { role: 'user', content: prompt },
+    ];
+
     await aiManager.processQueryStream(win.webContents, requestId, messages);
 });
 

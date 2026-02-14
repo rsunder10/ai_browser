@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Map to track wrapped callbacks so removeListener can find the correct function
+const listenerMap = new Map<Function, Function>();
+
 contextBridge.exposeInMainWorld('electron', {
     invoke: (channel: string, ...args: any[]) => {
         const validChannels = [
@@ -77,6 +80,9 @@ contextBridge.exposeInMainWorld('electron', {
             'overlay:set-active',
             'sync:export',
             'sync:import',
+            'ai:organize-tabs',
+            'ai:multi-tab-stream',
+            'ai:translate-page',
         ];
 
         if (validChannels.includes(channel)) {
@@ -94,10 +100,14 @@ contextBridge.exposeInMainWorld('electron', {
             'ai:open-sidebar',
             'permission:request',
             'shortcut:from-browserview',
+            'ai:translation-complete',
+            'ai:translation-error',
         ];
 
         if (validChannels.includes(channel)) {
-            ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+            const wrapped = (_event: any, ...args: any[]) => callback(...args);
+            listenerMap.set(callback, wrapped);
+            ipcRenderer.on(channel, wrapped);
         }
     },
     removeListener: (channel: string, callback: (...args: any[]) => void) => {
@@ -111,10 +121,16 @@ contextBridge.exposeInMainWorld('electron', {
             'ai:open-sidebar',
             'permission:request',
             'shortcut:from-browserview',
+            'ai:translation-complete',
+            'ai:translation-error',
         ];
 
         if (validChannels.includes(channel)) {
-            ipcRenderer.removeListener(channel, callback);
+            const wrapped = listenerMap.get(callback);
+            if (wrapped) {
+                ipcRenderer.removeListener(channel, wrapped as any);
+                listenerMap.delete(callback);
+            }
         }
     },
 });

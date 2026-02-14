@@ -39,6 +39,7 @@ export class TabManager {
     private sessionManager: SessionManager;
     private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
     private onExplainText?: (text: string) => void;
+    private onTranslateRequest?: (tabId: string, targetLang: string) => void;
     private readonly CHROME_HEIGHT = 100;
     private readonly isDevelopment = process.env.NODE_ENV === 'development';
     private readonly isIncognito = false;
@@ -133,6 +134,10 @@ export class TabManager {
 
     setOnExplainText(handler: (text: string) => void) {
         this.onExplainText = handler;
+    }
+
+    setOnTranslateRequest(handler: (tabId: string, targetLang: string) => void) {
+        this.onTranslateRequest = handler;
     }
 
     private log(...args: any[]) {
@@ -292,6 +297,24 @@ export class TabManager {
                 }));
                 menu.append(new MenuItem({ type: 'separator' }));
             }
+
+            // Translate Page submenu
+            const languages = ['Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Korean', 'Portuguese', 'Russian'];
+            menu.append(new MenuItem({
+                label: 'Translate Page',
+                type: 'submenu',
+                submenu: Menu.buildFromTemplate(
+                    languages.map(lang => ({
+                        label: lang,
+                        click: () => {
+                            if (this.onTranslateRequest) {
+                                this.onTranslateRequest(tabId, lang);
+                            }
+                        },
+                    }))
+                ),
+            }));
+            menu.append(new MenuItem({ type: 'separator' }));
 
             if (this.isDevelopment) {
                 menu.append(new MenuItem({
@@ -649,12 +672,16 @@ export class TabManager {
 
     async getActiveTabContent(): Promise<{ text: string; url: string; title: string } | null> {
         if (!this.activeTabId) return null;
-        const tab = this.tabs.get(this.activeTabId);
+        return this.getTabContent(this.activeTabId);
+    }
+
+    async getTabContent(tabId: string, maxChars: number = 15000): Promise<{ text: string; url: string; title: string } | null> {
+        const tab = this.tabs.get(tabId);
         if (!tab || !tab.view) return null;
 
         try {
             const text = await tab.view.webContents.executeJavaScript(
-                'document.body.innerText.substring(0, 15000)'
+                `document.body.innerText.substring(0, ${maxChars})`
             );
             return {
                 text: text || '',
@@ -664,6 +691,16 @@ export class TabManager {
         } catch {
             return null;
         }
+    }
+
+    async getMultiTabContent(tabIds: string[]): Promise<Array<{ text: string; url: string; title: string }>> {
+        const limited = tabIds.slice(0, 5);
+        const results: Array<{ text: string; url: string; title: string }> = [];
+        for (const id of limited) {
+            const content = await this.getTabContent(id, 10000);
+            if (content) results.push(content);
+        }
+        return results;
     }
 
     private async loadVisitCounts() {

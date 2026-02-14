@@ -54,11 +54,22 @@ function fuzzyScore(query: string, text: string): number {
     return qi === lowerQuery.length ? score : 0;
 }
 
+function isQuestion(query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (q.endsWith('?')) return true;
+    const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'is', 'are', 'can', 'does', 'do', 'will', 'should', 'could', 'would', 'explain', 'describe', 'tell me'];
+    return questionWords.some(w => q.startsWith(w + ' '));
+}
+
 export default function Omnibar({ tabs, onTabClick, onNavigate, onNewTab, onToggleAI, onClose }: OmnibarProps) {
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [bookmarks, setBookmarks] = useState<any[]>([]);
     const [history, setHistory] = useState<any[]>([]);
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const aiRequestIdRef = useRef<string | null>(null);
+    const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -80,7 +91,66 @@ export default function Omnibar({ tabs, onTabClick, onNavigate, onNewTab, onTogg
                 setHistory(entries.slice(0, 200));
             });
         }
+
+        // Cleanup AI listeners on unmount
+        return () => {
+            aiRequestIdRef.current = null;
+            if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        };
     }, []);
+
+    // AI answer streaming for questions
+    useEffect(() => {
+        if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+
+        const q = query.trim();
+        if (!q || q.length < 5 || !isQuestion(q) || q.startsWith('>') || q.startsWith('@') || q.startsWith('#')) {
+            setAiAnswer('');
+            setAiLoading(false);
+            aiRequestIdRef.current = null;
+            return;
+        }
+
+        aiDebounceRef.current = setTimeout(() => {
+            if (!window.electron) return;
+
+            // Cancel previous request by nulling the ref
+            aiRequestIdRef.current = null;
+            setAiAnswer('');
+            setAiLoading(true);
+
+            const requestId = 'omnibar-' + crypto.randomUUID();
+            aiRequestIdRef.current = requestId;
+
+            const handleChunk = (data: { requestId: string; content: string; done: boolean }) => {
+                if (data.requestId !== requestId || aiRequestIdRef.current !== requestId) return;
+                setAiAnswer(prev => prev + data.content);
+            };
+
+            const handleEnd = (data: { requestId: string; error?: string }) => {
+                if (data.requestId !== requestId) return;
+                if (data.error && aiRequestIdRef.current === requestId) {
+                    setAiAnswer(data.error);
+                }
+                setAiLoading(false);
+                window.electron.removeListener('ai:stream-chunk', handleChunk);
+                window.electron.removeListener('ai:stream-end', handleEnd);
+            };
+
+            window.electron.on('ai:stream-chunk', handleChunk);
+            window.electron.on('ai:stream-end', handleEnd);
+
+            window.electron.invoke('ai:chat-stream', {
+                messages: [{ role: 'user', content: q }],
+                requestId,
+                skipPageContext: true,
+            });
+        }, 600);
+
+        return () => {
+            if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        };
+    }, [query]);
 
     const commands: ResultItem[] = [
         { id: 'cmd-new-tab', category: 'command', title: 'New Tab', icon: <Plus size={14} />, action: () => { onNewTab(); onClose(); } },
@@ -278,7 +348,20 @@ export default function Omnibar({ tabs, onTabClick, onNavigate, onNewTab, onTogg
                     />
                 </div>
                 <div className="omnibar-results" ref={resultsRef}>
-                    {results.length === 0 ? (
+                    {(aiAnswer || aiLoading) && (
+                        <div className="omnibar-ai-answer">
+                            <div className="omnibar-ai-header">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                                </svg>
+                                AI Answer
+                            </div>
+                            <div className="omnibar-ai-content">
+                                {aiAnswer || (aiLoading && <span className="omnibar-ai-loading">Thinking...</span>)}
+                            </div>
+                        </div>
+                    )}
+                    {results.length === 0 && !aiAnswer && !aiLoading ? (
                         <div className="omnibar-empty">No results found</div>
                     ) : (
                         results.map((item, idx) => {

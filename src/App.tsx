@@ -32,6 +32,7 @@ function App() {
   const [showOmnibar, setShowOmnibar] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
   const [pendingExplainText, setPendingExplainText] = useState<string | null>(null);
+  const [translationNotice, setTranslationNotice] = useState<string | null>(null);
   const initialized = useRef(false);
 
   // Load tabs on mount
@@ -167,6 +168,18 @@ function App() {
     };
     window.electron.on('ai:open-sidebar', handleOpenSidebar);
 
+    // Listen for translation events
+    const handleTranslationComplete = (data: { lang: string }) => {
+      setTranslationNotice(`Page translated to ${data.lang}`);
+      setTimeout(() => setTranslationNotice(null), 3000);
+    };
+    const handleTranslationError = (data: { error: string }) => {
+      setTranslationNotice(`Translation failed: ${data.error}`);
+      setTimeout(() => setTranslationNotice(null), 4000);
+    };
+    window.electron.on('ai:translation-complete', handleTranslationComplete);
+    window.electron.on('ai:translation-error', handleTranslationError);
+
     // Listen for forwarded shortcuts from BrowserView
     const handleBrowserViewShortcut = (data: { key: string }) => {
       executeShortcut(data.key);
@@ -195,6 +208,8 @@ function App() {
         window.electron.removeListener('tabs:list-changed', handleTabsListChanged);
         window.electron.removeListener('trigger-find', handleTriggerFind);
         window.electron.removeListener('ai:open-sidebar', handleOpenSidebar);
+        window.electron.removeListener('ai:translation-complete', handleTranslationComplete);
+        window.electron.removeListener('ai:translation-error', handleTranslationError);
         window.electron.removeListener('shortcut:from-browserview', handleBrowserViewShortcut);
       }
       window.removeEventListener('keydown', handleKeyDown);
@@ -398,6 +413,7 @@ function App() {
         currentUrl={currentUrl}
         pendingExplainText={pendingExplainText}
         onExplainConsumed={() => setPendingExplainText(null)}
+        tabs={tabs}
       />
 
       {showFindInPage && (
@@ -418,6 +434,10 @@ function App() {
           }}
           onClose={closeOmnibar}
         />
+      )}
+
+      {translationNotice && (
+        <div className="translation-notice">{translationNotice}</div>
       )}
 
       <div className="status-bar">

@@ -1,5 +1,5 @@
 
-import { X, Plus, Folder, Pin, VolumeX } from 'lucide-react';
+import { X, Plus, Folder, Pin, VolumeX, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Tab {
@@ -31,6 +31,9 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupColor, setNewGroupColor] = useState('#3B82F6');
     const [targetTabId, setTargetTabId] = useState<string | null>(null);
+    const [showOrganizeDialog, setShowOrganizeDialog] = useState(false);
+    const [organizeLoading, setOrganizeLoading] = useState(false);
+    const [organizeSuggestions, setOrganizeSuggestions] = useState<Array<{ name: string; color: string; tabIds: string[] }>>([]);
 
     useEffect(() => {
         loadGroups();
@@ -81,6 +84,45 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
 
     const closeDialog = () => {
         setShowNewGroupDialog(false);
+        if (window.electron) {
+            window.electron.invoke('tabs:set-visibility', true);
+        }
+    };
+
+    const handleOrganize = async () => {
+        if (!window.electron || organizeLoading) return;
+        setOrganizeLoading(true);
+        setShowOrganizeDialog(true);
+        window.electron.invoke('tabs:set-visibility', false);
+        try {
+            const suggestions = await window.electron.invoke('ai:organize-tabs');
+            setOrganizeSuggestions(suggestions || []);
+        } catch (err) {
+            console.error('Organize failed:', err);
+            setOrganizeSuggestions([]);
+        }
+        setOrganizeLoading(false);
+    };
+
+    const applyOrganization = async () => {
+        if (!window.electron) return;
+        for (const group of organizeSuggestions) {
+            const newGroup = await window.electron.invoke('tabs:create-group', group.name, group.color);
+            if (newGroup) {
+                for (const tabId of group.tabIds) {
+                    await window.electron.invoke('tabs:add-to-group', tabId, newGroup.id);
+                }
+            }
+        }
+        setShowOrganizeDialog(false);
+        setOrganizeSuggestions([]);
+        window.electron.invoke('tabs:set-visibility', true);
+        loadGroups();
+    };
+
+    const closeOrganizeDialog = () => {
+        setShowOrganizeDialog(false);
+        setOrganizeSuggestions([]);
         if (window.electron) {
             window.electron.invoke('tabs:set-visibility', true);
         }
@@ -174,6 +216,14 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                     </div>
                 ))}
 
+                <button
+                    className="organize-btn"
+                    onClick={handleOrganize}
+                    title="Organize tabs with AI"
+                    disabled={organizeLoading || tabs.filter(t => !t.url?.startsWith('neuralweb://')).length < 2}
+                >
+                    <Sparkles size={16} />
+                </button>
                 <button className="new-tab-btn" onClick={onNewTab} title="New Tab">
                     <Plus size={18} />
                 </button>
@@ -215,6 +265,79 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                         <div className="modal-actions">
                             <button onClick={closeDialog}>Cancel</button>
                             <button onClick={createGroup} disabled={!newGroupName.trim()}>Create</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Organize Dialog */}
+            {showOrganizeDialog && (
+                <div className="modal-overlay" onClick={closeOrganizeDialog}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Sparkles size={18} style={{ color: '#8b5cf6' }} />
+                            Organize Tabs
+                        </h3>
+                        {organizeLoading ? (
+                            <div style={{ padding: '20px 0', textAlign: 'center', color: '#9ca3af' }}>
+                                Analyzing tabs...
+                            </div>
+                        ) : organizeSuggestions.length === 0 ? (
+                            <div style={{ padding: '20px 0', textAlign: 'center', color: '#9ca3af' }}>
+                                Could not generate suggestions. Try again.
+                            </div>
+                        ) : (
+                            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                                {organizeSuggestions.map((group, i) => (
+                                    <div key={i} style={{ marginBottom: 12 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <div style={{
+                                                width: 12, height: 12, borderRadius: '50%',
+                                                background: group.color, flexShrink: 0
+                                            }} />
+                                            <input
+                                                type="text"
+                                                value={group.name}
+                                                onChange={(e) => {
+                                                    setOrganizeSuggestions(prev => prev.map((g, j) =>
+                                                        j === i ? { ...g, name: e.target.value } : g
+                                                    ));
+                                                }}
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                                                    borderRadius: 4, padding: '2px 6px', color: '#e5e7eb', fontSize: 13, flex: 1
+                                                }}
+                                            />
+                                            <div style={{ display: 'flex', gap: 3 }}>
+                                                {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'].map(color => (
+                                                    <div
+                                                        key={color}
+                                                        onClick={() => {
+                                                            setOrganizeSuggestions(prev => prev.map((g, j) =>
+                                                                j === i ? { ...g, color } : g
+                                                            ));
+                                                        }}
+                                                        style={{
+                                                            width: 16, height: 16, borderRadius: '50%', background: color,
+                                                            cursor: 'pointer',
+                                                            border: group.color === color ? '2px solid white' : '2px solid transparent',
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div style={{ paddingLeft: 20, fontSize: 11, color: '#6b7280' }}>
+                                            {group.tabIds.length} tab{group.tabIds.length !== 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="modal-actions">
+                            <button onClick={closeOrganizeDialog}>Cancel</button>
+                            <button onClick={applyOrganization} disabled={organizeLoading || organizeSuggestions.length === 0}>
+                                Apply
+                            </button>
                         </div>
                     </div>
                 </div>

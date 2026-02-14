@@ -68,12 +68,15 @@ declare global {
             invoke(channel: 'print:page'): Promise<void>;
 
             invoke(channel: 'ai_query', data: { provider: string; prompt: string }): Promise<string>;
-            invoke(channel: 'ai:chat-stream', data: { messages: Array<{ role: string; content: string }>; requestId: string }): Promise<void>;
+            invoke(channel: 'ai:chat-stream', data: { messages: Array<{ role: string; content: string }>; requestId: string; skipPageContext?: boolean }): Promise<void>;
             invoke(channel: 'ai:summarize', data: { requestId: string }): Promise<void>;
             invoke(channel: 'ai:suggest', query: string): Promise<string[]>;
             invoke(channel: 'ai:status'): Promise<{ status: string; error: string | null }>;
             invoke(channel: 'ai:models'): Promise<{ models: Array<{ name: string; size: number; digest: string }> }>;
             invoke(channel: 'ai:pull-model', name: string): Promise<{ status: string }>;
+            invoke(channel: 'ai:multi-tab-stream', data: { tabIds: string[]; prompt: string; requestId: string }): Promise<void>;
+            invoke(channel: 'ai:organize-tabs'): Promise<Array<{ name: string; color: string; tabIds: string[] }>>;
+            invoke(channel: 'ai:translate-page', targetLang: string): Promise<void>;
             invoke(channel: 'ai:sidebar-toggle', open: boolean): Promise<void>;
             invoke(channel: 'overlay:set-active', active: boolean): Promise<void>;
 
@@ -93,6 +96,8 @@ declare global {
             on(channel: 'ai:open-sidebar', func: (data: { text: string; action: string }) => void): void;
             on(channel: 'permission:request', func: (data: { requestId: string; origin: string; permission: string }) => void): void;
             on(channel: 'shortcut:from-browserview', func: (data: { key: string; meta: boolean; shift: boolean; alt: boolean }) => void): void;
+            on(channel: 'ai:translation-complete', func: (data: { lang: string }) => void): void;
+            on(channel: 'ai:translation-error', func: (data: { error: string }) => void): void;
             on(channel: string, func: (...args: any[]) => void): void;
             removeListener(channel: string, func: (...args: any[]) => void): void;
         };

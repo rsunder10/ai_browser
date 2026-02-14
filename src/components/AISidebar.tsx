@@ -2,12 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './AISidebar.css';
 
+interface TabInfo {
+    id: string;
+    url: string;
+    title: string;
+}
+
 interface AISidebarProps {
     isOpen: boolean;
     onToggle: () => void;
     currentUrl: string;
     pendingExplainText?: string | null;
     onExplainConsumed?: () => void;
+    tabs?: TabInfo[];
 }
 
 interface Message {
@@ -15,13 +22,18 @@ interface Message {
     content: string;
 }
 
-export default function AISidebar({ isOpen, onToggle, currentUrl: _currentUrl, pendingExplainText, onExplainConsumed }: AISidebarProps) {
+export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplainText, onExplainConsumed, tabs: allTabs = [] }: AISidebarProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [modelName, setModelName] = useState('');
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    const [multiTabMode, setMultiTabMode] = useState(false);
+    const [selectedTabIds, setSelectedTabIds] = useState<string[]>([]);
+
+    const hasPageContext = currentUrl && !currentUrl.startsWith('neuralweb://') && currentUrl !== 'about:blank' && currentUrl !== '';
 
     // Auto-scroll to bottom when messages change — use scrollTop to avoid stealing focus
     useEffect(() => {
@@ -93,13 +105,22 @@ export default function AISidebar({ isOpen, onToggle, currentUrl: _currentUrl, p
             const chatMessages = toSend.filter(m => m.content.length > 0);
 
             setupStreamListeners(requestId);
-            window.electron.invoke('ai:chat-stream', { messages: chatMessages, requestId });
+
+            if (multiTabMode && selectedTabIds.length >= 2) {
+                window.electron.invoke('ai:multi-tab-stream', {
+                    tabIds: selectedTabIds,
+                    prompt: text,
+                    requestId,
+                });
+            } else {
+                window.electron.invoke('ai:chat-stream', { messages: chatMessages, requestId });
+            }
 
             return newMessages;
         });
 
         setIsLoading(true);
-    }, [isLoading, setupStreamListeners]);
+    }, [isLoading, setupStreamListeners, multiTabMode, selectedTabIds]);
 
     const handleSend = () => {
         if (!input.trim()) return;
@@ -200,7 +221,55 @@ export default function AISidebar({ isOpen, onToggle, currentUrl: _currentUrl, p
                     </svg>
                     Summarize Page
                 </button>
+                <button
+                    className={`ai-action-chip ${multiTabMode ? 'active' : ''}`}
+                    onClick={() => { setMultiTabMode(m => !m); setSelectedTabIds([]); }}
+                    disabled={isLoading}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                    Multi-Tab
+                </button>
+                {hasPageContext && (
+                    <span className="ai-context-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                        </svg>
+                        Page context active
+                    </span>
+                )}
             </div>
+
+            {multiTabMode && (
+                <div className="ai-tab-selector">
+                    <div className="ai-tab-selector-header">Select 2-5 tabs to compare:</div>
+                    {allTabs.filter(t => !t.url.startsWith('neuralweb://')).map(tab => (
+                        <label key={tab.id} className="ai-tab-option">
+                            <input
+                                type="checkbox"
+                                checked={selectedTabIds.includes(tab.id)}
+                                onChange={(e) => {
+                                    if (e.target.checked && selectedTabIds.length < 5) {
+                                        setSelectedTabIds(prev => [...prev, tab.id]);
+                                    } else if (!e.target.checked) {
+                                        setSelectedTabIds(prev => prev.filter(id => id !== tab.id));
+                                    }
+                                }}
+                                disabled={!selectedTabIds.includes(tab.id) && selectedTabIds.length >= 5}
+                            />
+                            <span className="ai-tab-option-title">{tab.title || tab.url}</span>
+                        </label>
+                    ))}
+                    {selectedTabIds.length > 0 && selectedTabIds.length < 2 && (
+                        <div className="ai-tab-selector-hint">Select at least 2 tabs</div>
+                    )}
+                </div>
+            )}
 
             <div className="ai-messages" ref={messagesContainerRef}>
                 {messages.length === 0 && (

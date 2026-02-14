@@ -20,17 +20,24 @@ export class AIManager {
 
     private trimMessages(messages: Array<{ role: string; content: string }>): Array<{ role: string; content: string }> {
         const MAX_CHARS = 8000;
+
+        // Separate system context messages from user/assistant messages
+        const systemMessages = messages.filter(m => m.role === 'system');
+        const chatMessages = messages.filter(m => m.role !== 'system');
+
         let totalChars = 0;
         const trimmed: Array<{ role: string; content: string }> = [];
 
-        // Keep messages from most recent, working backwards
-        for (let i = messages.length - 1; i >= 0; i--) {
-            const msgChars = messages[i].content.length;
+        // Keep chat messages from most recent, working backwards
+        for (let i = chatMessages.length - 1; i >= 0; i--) {
+            const msgChars = chatMessages[i].content.length;
             if (totalChars + msgChars > MAX_CHARS && trimmed.length > 0) break;
             totalChars += msgChars;
-            trimmed.unshift(messages[i]);
+            trimmed.unshift(chatMessages[i]);
         }
-        return trimmed;
+
+        // Prepend system context messages (never trim these)
+        return [...systemMessages, ...trimmed];
     }
 
     async processQuery(provider: string, prompt: string): Promise<string> {
@@ -88,9 +95,17 @@ export class AIManager {
             const model = this.getModel();
 
             const trimmed = this.trimMessages(messages);
+
+            // Merge any context system messages into the base system prompt
+            const contextSystemMessages = trimmed.filter(m => m.role === 'system');
+            const chatMessages = trimmed.filter(m => m.role !== 'system');
+            const systemContent = contextSystemMessages.length > 0
+                ? SYSTEM_PROMPT + '\n\n' + contextSystemMessages.map(m => m.content).join('\n\n')
+                : SYSTEM_PROMPT;
+
             const fullMessages = [
-                { role: 'system', content: SYSTEM_PROMPT },
-                ...trimmed,
+                { role: 'system', content: systemContent },
+                ...chatMessages,
             ];
 
             const response = await net.fetch(`${baseUrl}/api/chat`, {
@@ -158,6 +173,59 @@ export class AIManager {
             console.error('[AIManager] Stream error:', err.message);
             webContents.send('ai:stream-end', { requestId, error: 'Failed to reach the AI model.' });
         }
+    }
+
+    async suggestTabGroups(tabs: Array<{ id: string; title: string; url: string }>): Promise<Array<{ name: string; color: string; tabIds: string[] }>> {
+        const { status } = this.ollamaManager.getStatus();
+        if (status !== 'running') return [];
+
+        const tabList = tabs.map((t, i) => `${i + 1}. [${t.id}] "${t.title}" — ${t.url}`).join('\n');
+        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
+
+        try {
+            const baseUrl = this.ollamaManager.getBaseUrl();
+            const model = this.getModel();
+
+            const response = await net.fetch(`${baseUrl}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You organize browser tabs into logical groups. Given a list of tabs, suggest groups based on topic/domain similarity. Return ONLY a JSON array with objects having: "name" (short group name), "color" (one of: ${colors.join(', ')}), "tabIds" (array of tab ID strings). Every tab should be in exactly one group. If tabs don't fit together, put them in a "Other" group. Return ONLY valid JSON, no other text.`,
+                        },
+                        { role: 'user', content: `Here are the tabs:\n${tabList}` },
+                    ],
+                    stream: false,
+                }),
+            });
+
+            if (!response.ok) return [];
+
+            const data = await response.json() as { message?: { content?: string } };
+            const content = data.message?.content || '';
+
+            const match = content.match(/\[[\s\S]*\]/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((g: any) =>
+                        g.name && g.color && Array.isArray(g.tabIds) && g.tabIds.length > 0
+                    );
+                }
+            }
+            return [];
+        } catch (err: any) {
+            console.error('[AIManager] Tab grouping error:', err.message);
+            return [];
+        }
+    }
+
+    async translateText(text: string, targetLang: string): Promise<string> {
+        const prompt = `Translate the following text to ${targetLang}. Return ONLY the translated text, nothing else.\n\n${text}`;
+        return this.processQuery('ollama', prompt);
     }
 
     async getSuggestions(query: string): Promise<string[]> {
