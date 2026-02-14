@@ -37,14 +37,19 @@ neural-web/
 │   │   ├── PermissionsManager.ts
 │   │   ├── ExtensionsManager.ts
 │   │   ├── ReaderManager.ts
-│   │   └── AdBlockerManager.ts
+│   │   ├── AdBlockerManager.ts
+│   │   └── SyncManager.ts   # Cross-device sync
+│   ├── pages/
+│   │   └── crash.html       # Crash error page
 │   └── utils/
 │       └── Store.ts         # JSON file persistence
 ├── src/                     # Renderer process
 │   ├── App.tsx              # Root component, tab state
+│   ├── main.tsx             # React entry point
 │   ├── components/
 │   │   ├── BrowserChrome.tsx # Chrome container
 │   │   ├── TabBar.tsx
+│   │   ├── TabContent.tsx   # Tab content area
 │   │   ├── AddressBar.tsx
 │   │   ├── NavigationControls.tsx
 │   │   ├── BookmarksBar.tsx
@@ -52,6 +57,7 @@ neural-web/
 │   │   ├── AISidebar.tsx
 │   │   ├── Omnibar.tsx
 │   │   ├── FindInPage.tsx
+│   │   ├── WebViewContainer.tsx
 │   │   ├── HomePage.tsx
 │   │   ├── BookmarksPage.tsx
 │   │   ├── HistoryPage.tsx
