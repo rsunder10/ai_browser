@@ -1,5 +1,5 @@
 
-import { X, Plus, Folder, Pin, VolumeX, Sparkles } from 'lucide-react';
+import { X, Plus, Folder, Pin, VolumeX, Sparkles, Container } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Tab {
@@ -15,6 +15,7 @@ interface TabGroup {
     id: string;
     name: string;
     color: string;
+    isContainer?: boolean;
 }
 
 interface TabBarProps {
@@ -31,6 +32,7 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupColor, setNewGroupColor] = useState('#3B82F6');
     const [targetTabId, setTargetTabId] = useState<string | null>(null);
+    const [newGroupIsContainer, setNewGroupIsContainer] = useState(false);
     const [showOrganizeDialog, setShowOrganizeDialog] = useState(false);
     const [organizeLoading, setOrganizeLoading] = useState(false);
     const [organizeSuggestions, setOrganizeSuggestions] = useState<Array<{ name: string; color: string; tabIds: string[] }>>([]);
@@ -73,11 +75,11 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
     const createGroup = async () => {
         if (!newGroupName.trim() || !window.electron || !targetTabId) return;
 
-        const newGroup = await window.electron.invoke('tabs:create-group', newGroupName, newGroupColor);
+        const newGroup = await window.electron.invoke('tabs:create-group', newGroupName, newGroupColor, newGroupIsContainer);
         if (newGroup) {
             await window.electron.invoke('tabs:add-to-group', targetTabId, newGroup.id);
-            // State update will happen via tab-updated event
             setShowNewGroupDialog(false);
+            setNewGroupIsContainer(false);
             window.electron.invoke('tabs:set-visibility', true);
         }
     };
@@ -181,14 +183,21 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                 {groupedTabs.map(({ group, tabs: groupTabs }) => (
                     <div key={group.id} className="tab-group">
                         <div className="group-header" style={{ borderLeftColor: group.color }}>
-                            <Folder size={14} style={{ color: group.color }} />
+                            {group.isContainer ? (
+                                <Container size={14} style={{ color: group.color }} />
+                            ) : (
+                                <Folder size={14} style={{ color: group.color }} />
+                            )}
                             <span>{group.name}</span>
                         </div>
                         {groupTabs.map(tab => (
                             <div
                                 key={tab.id}
                                 className={`tab grouped ${tab.id === activeTabId ? 'active' : ''}`}
-                                style={{ borderLeft: `3px solid ${group.color}` }}
+                                style={{
+                                    borderLeft: `3px solid ${group.color}`,
+                                    ...(group.isContainer ? { borderTop: `2px solid ${group.color}` } : {})
+                                }}
                                 onClick={() => onTabClick(tab.id)}
                                 onContextMenu={(e) => {
                                     e.preventDefault();
@@ -262,6 +271,16 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                                 />
                             ))}
                         </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: '#5f6368', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={newGroupIsContainer}
+                                onChange={e => setNewGroupIsContainer(e.target.checked)}
+                                style={{ width: 'auto' }}
+                            />
+                            <Container size={14} />
+                            Container (isolated session)
+                        </label>
                         <div className="modal-actions">
                             <button onClick={closeDialog}>Cancel</button>
                             <button onClick={createGroup} disabled={!newGroupName.trim()}>Create</button>

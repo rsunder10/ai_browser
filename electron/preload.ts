@@ -68,6 +68,16 @@ contextBridge.exposeInMainWorld('electron', {
             'passwords:delete',
             'adblocker:toggle',
             'adblocker:status',
+            'adblocker:get-tab-stats',
+            'adblocker:get-all-stats',
+            'adblocker:clear-stats',
+            'security:get-certificate',
+            'cookies:get-all',
+            'cookies:get-for-domain',
+            'cookies:delete',
+            'cookies:clear-domain',
+            'cookies:clear-all',
+            'tabs:set-group-container',
             'tabs:create-group',
             'tabs:add-to-group',
             'tabs:remove-from-group',
@@ -102,6 +112,7 @@ contextBridge.exposeInMainWorld('electron', {
             'shortcut:from-browserview',
             'ai:translation-complete',
             'ai:translation-error',
+            'privacy:tab-stats-updated',
         ];
 
         if (validChannels.includes(channel)) {
@@ -123,6 +134,7 @@ contextBridge.exposeInMainWorld('electron', {
             'shortcut:from-browserview',
             'ai:translation-complete',
             'ai:translation-error',
+            'privacy:tab-stats-updated',
         ];
 
         if (validChannels.includes(channel)) {

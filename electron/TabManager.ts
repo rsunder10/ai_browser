@@ -10,6 +10,8 @@ interface TabGroup {
     id: string;
     name: string;
     color: string;
+    isContainer?: boolean;
+    sessionPartition?: string;
 }
 
 interface Tab {
@@ -21,6 +23,7 @@ interface Tab {
     history: string[];
     historyIndex: number;
     groupId?: string;
+    containerPartition?: string;
     scrollPosition?: { x: number; y: number };
     pinned: boolean;
     muted: boolean;
@@ -47,6 +50,8 @@ export class TabManager {
     private readonly SUSPEND_AFTER_MS = 10 * 60 * 1000; // 10 minutes
     private aiSidebarWidth: number = 0; // 0 when closed, sidebar width when open
     private overlayActive: boolean = false;
+    private pendingHttpsUpgrades: Map<string, string> = new Map(); // tabId -> original http URL
+    private onTabNavigate?: (tabId: string, url: string) => void;
 
     constructor(historyManager: HistoryManager, sessionManager: SessionManager) {
         this.settingsManager = new SettingsManager();
@@ -97,13 +102,15 @@ export class TabManager {
         if (!tab || !tab.suspended || !this.mainWindow) return;
 
         this.log('Unsuspending tab:', tabId, tab.url);
-        const view = new BrowserView({
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: false,
-            },
-        });
+        const webPreferences: any = {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+        };
+        if (tab.containerPartition) {
+            webPreferences.partition = tab.containerPartition;
+        }
+        const view = new BrowserView({ webPreferences });
 
         tab.view = view;
         tab.suspended = false;
@@ -138,6 +145,19 @@ export class TabManager {
 
     setOnTranslateRequest(handler: (tabId: string, targetLang: string) => void) {
         this.onTranslateRequest = handler;
+    }
+
+    setOnTabNavigate(handler: (tabId: string, url: string) => void) {
+        this.onTabNavigate = handler;
+    }
+
+    getTabIdByWebContentsId(webContentsId: number): string | null {
+        for (const [tabId, tab] of this.tabs) {
+            if (tab.view && !tab.view.webContents.isDestroyed() && tab.view.webContents.id === webContentsId) {
+                return tabId;
+            }
+        }
+        return null;
     }
 
     private log(...args: any[]) {
@@ -239,8 +259,12 @@ export class TabManager {
             const tab = this.tabs.get(tabId);
             if (tab) {
                 tab.url = url;
+                this.pendingHttpsUpgrades.delete(tabId); // successful load clears pending upgrade
                 this.sendTabUpdate(tabId);
                 this.recordNavigation(url);
+                if (this.onTabNavigate) {
+                    this.onTabNavigate(tabId, url);
+                }
                 this.log('Navigated to:', url);
             }
         });
@@ -358,10 +382,30 @@ export class TabManager {
 
         view.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
             console.error('[TabManager] Failed to load:', errorDescription, 'Code:', errorCode);
+
+            // HTTPS-Only Mode: show interstitial if upgraded URL failed
+            const originalUrl = this.pendingHttpsUpgrades.get(tabId);
+            if (originalUrl) {
+                this.pendingHttpsUpgrades.delete(tabId);
+                const html = this.buildHttpsInterstitialHtml(originalUrl, tabId);
+                view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => {});
+            }
         });
 
         view.webContents.on('did-finish-load', () => {
             this.log('Page loaded for tab:', tabId);
+        });
+
+        // Handle "Proceed Anyway" from HTTPS interstitial
+        view.webContents.on('will-navigate', (_event, url) => {
+            if (url.startsWith('neuralweb-proceed://')) {
+                _event.preventDefault();
+                const originalUrl = decodeURIComponent(url.replace('neuralweb-proceed://', ''));
+                // Load the original HTTP URL bypassing HTTPS upgrade
+                view.webContents.loadURL(originalUrl).catch(err => {
+                    console.error('[TabManager] Failed to proceed to HTTP URL:', err);
+                });
+            }
         });
 
         view.webContents.on('render-process-gone', (_event, details) => {
@@ -407,9 +451,11 @@ export class TabManager {
             id: tabId,
             url: url,
             title: url === 'neuralweb://home' ? 'Home' :
-                (url === 'neuralweb://settings' ? 'Settings' :
-                    (url === 'neuralweb://downloads' ? 'Downloads' :
-                        (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url))),
+                url === 'neuralweb://settings' ? 'Settings' :
+                url === 'neuralweb://downloads' ? 'Downloads' :
+                url === 'neuralweb://bookmarks' ? 'Bookmarks' :
+                url === 'neuralweb://privacy' ? 'Tracker Dashboard' :
+                url === 'neuralweb://cookies' ? 'Cookie Manager' : url,
             view: null as any,
             history: initialState?.history || [],
             historyIndex: initialState?.historyIndex || 0,
@@ -434,13 +480,15 @@ export class TabManager {
             ? url
             : `https://${url}`;
 
-        const view = new BrowserView({
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: false,
-            },
-        });
+        const webPrefsCreate: any = {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+        };
+        if (tabInfo.containerPartition) {
+            webPrefsCreate.partition = tabInfo.containerPartition;
+        }
+        const view = new BrowserView({ webPreferences: webPrefsCreate });
 
         mainWindow.addBrowserView(view);
 
@@ -544,6 +592,32 @@ export class TabManager {
         this.saveSession();
     }
 
+    private buildHttpsInterstitialHtml(originalUrl: string, tabId: string): string {
+        return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Connection Not Secure</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1b1e; color: #e8eaed; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.container { text-align: center; max-width: 500px; padding: 40px; }
+.icon { font-size: 64px; margin-bottom: 20px; }
+h1 { font-size: 22px; margin-bottom: 12px; color: #f59e0b; }
+p { font-size: 14px; color: #9aa0a6; line-height: 1.6; margin-bottom: 24px; }
+.url { background: #292a2d; padding: 8px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; margin-bottom: 24px; word-break: break-all; }
+button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin: 0 8px; }
+.proceed { background: #3c4043; color: #e8eaed; }
+.proceed:hover { background: #5f6368; }
+.back { background: #1a73e8; color: white; }
+.back:hover { background: #1765cc; }
+</style></head>
+<body><div class="container">
+<div class="icon">&#x26A0;</div>
+<h1>HTTPS-Only Mode</h1>
+<p>The site <strong>${originalUrl}</strong> does not support HTTPS. Your connection to this site is not secure.</p>
+<div class="url">${originalUrl}</div>
+<button class="back" onclick="history.back()">Go Back</button>
+<button class="proceed" onclick="window.location.href='neuralweb-proceed://${encodeURIComponent(originalUrl)}'">Proceed Anyway</button>
+</div></body></html>`;
+    }
+
     navigateTab(tabId: string, url: string) {
         const tab = this.tabs.get(tabId);
         if (!tab) return;
@@ -558,9 +632,11 @@ export class TabManager {
             tab.view = null as any;
             tab.url = url;
             tab.title = url === 'neuralweb://home' ? 'Home' :
-                (url === 'neuralweb://settings' ? 'Settings' :
-                    (url === 'neuralweb://downloads' ? 'Downloads' :
-                        (url === 'neuralweb://bookmarks' ? 'Bookmarks' : url)));
+                url === 'neuralweb://settings' ? 'Settings' :
+                url === 'neuralweb://downloads' ? 'Downloads' :
+                url === 'neuralweb://bookmarks' ? 'Bookmarks' :
+                url === 'neuralweb://privacy' ? 'Tracker Dashboard' :
+                url === 'neuralweb://cookies' ? 'Cookie Manager' : url;
             tab.suspended = false;
 
             this.sendTabUpdate(tabId);
@@ -568,18 +644,28 @@ export class TabManager {
             return;
         }
 
-        const urlString = url.startsWith('http://') || url.startsWith('https://')
+        let urlString = url.startsWith('http://') || url.startsWith('https://')
             ? url
             : `https://${url}`;
 
+        // HTTPS-Only Mode: upgrade http:// to https://
+        const httpsOnly = this.settingsManager.get('httpsOnlyMode');
+        if (httpsOnly && urlString.startsWith('http://')) {
+            const upgraded = urlString.replace(/^http:\/\//, 'https://');
+            this.pendingHttpsUpgrades.set(tabId, urlString);
+            urlString = upgraded;
+        }
+
         if (!tab.view && this.mainWindow) {
-            const view = new BrowserView({
-                webPreferences: {
-                    nodeIntegration: false,
-                    contextIsolation: true,
-                    sandbox: false,
-                },
-            });
+            const webPrefsNav: any = {
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: false,
+            };
+            if (tab.containerPartition) {
+                webPrefsNav.partition = tab.containerPartition;
+            }
+            const view = new BrowserView({ webPreferences: webPrefsNav });
 
             this.mainWindow.addBrowserView(view);
             const bounds = this.mainWindow.getContentBounds();
@@ -845,9 +931,10 @@ export class TabManager {
     }
 
     // Tab Groups Management
-    createGroup(name: string, color: string): TabGroup {
+    createGroup(name: string, color: string, isContainer: boolean = false): TabGroup {
         const id = randomUUID();
-        const group = { id, name, color };
+        const partition = isContainer ? `persist:container-${id}` : undefined;
+        const group: TabGroup = { id, name, color, isContainer, sessionPartition: partition };
         this.groups.set(id, group);
         this.saveSession();
         return group;
@@ -864,6 +951,13 @@ export class TabManager {
         if (!tab || !group) return false;
 
         tab.groupId = groupId;
+
+        // If container group, assign partition and rebuild BrowserView
+        if (group.isContainer && group.sessionPartition && tab.containerPartition !== group.sessionPartition) {
+            tab.containerPartition = group.sessionPartition;
+            this.rebuildTabView(tabId);
+        }
+
         this.saveSession();
         this.sendTabUpdate(tabId);
         return true;
@@ -874,10 +968,96 @@ export class TabManager {
 
         if (!tab) return false;
 
+        // If leaving container group, remove partition and rebuild
+        if (tab.containerPartition) {
+            tab.containerPartition = undefined;
+            this.rebuildTabView(tabId);
+        }
+
         tab.groupId = undefined;
         this.saveSession();
         this.sendTabUpdate(tabId);
         return true;
+    }
+
+    setGroupContainer(groupId: string, enable: boolean, name?: string): boolean {
+        const group = this.groups.get(groupId);
+        if (!group) return false;
+
+        group.isContainer = enable;
+        if (enable && !group.sessionPartition) {
+            group.sessionPartition = `persist:container-${groupId}`;
+        }
+        if (name) group.name = name;
+
+        // Update all tabs in this group
+        this.tabs.forEach((tab, tabId) => {
+            if (tab.groupId === groupId) {
+                if (enable) {
+                    tab.containerPartition = group.sessionPartition;
+                } else {
+                    tab.containerPartition = undefined;
+                }
+                this.rebuildTabView(tabId);
+            }
+        });
+
+        this.saveSession();
+        return true;
+    }
+
+    private rebuildTabView(tabId: string): void {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !this.mainWindow) return;
+
+        const currentUrl = tab.url;
+        const isActive = this.activeTabId === tabId;
+
+        // Destroy old view
+        if (tab.view) {
+            this.mainWindow.removeBrowserView(tab.view);
+            if (!tab.view.webContents.isDestroyed()) {
+                (tab.view.webContents as any).destroy();
+            }
+        }
+
+        // Skip rebuild for internal pages
+        if (currentUrl.startsWith('neuralweb://')) {
+            tab.view = null as any;
+            return;
+        }
+
+        // Create new view with partition
+        const webPreferences: any = {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+        };
+        if (tab.containerPartition) {
+            webPreferences.partition = tab.containerPartition;
+        }
+
+        const view = new BrowserView({ webPreferences });
+        tab.view = view;
+        tab.suspended = false;
+
+        this.setupBrowserView(view, tabId);
+
+        if (isActive) {
+            this.mainWindow.addBrowserView(view);
+            const bounds = this.mainWindow.getContentBounds();
+            view.setBounds({
+                x: 0,
+                y: this.CHROME_HEIGHT,
+                width: bounds.width - this.aiSidebarWidth,
+                height: bounds.height - this.CHROME_HEIGHT,
+            });
+        }
+
+        // Reload the URL
+        view.webContents.loadURL(currentUrl).catch(err => {
+            console.error(`[TabManager] Failed to reload tab after rebuild:`, err);
+        });
     }
 
     getGroups(): TabGroup[] {

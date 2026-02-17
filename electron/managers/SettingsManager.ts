@@ -6,6 +6,8 @@ export interface Settings {
     homePage: string;
     aiModel: string;
     aiSuggestionsEnabled: boolean;
+    httpsOnlyMode: boolean;
+    autoClearCookieDomains: string[];
 }
 
 export class SettingsManager {
@@ -19,7 +21,9 @@ export class SettingsManager {
                 theme: 'system',
                 homePage: 'neuralweb://home',
                 aiModel: 'llama3.2:1b',
-                aiSuggestionsEnabled: false
+                aiSuggestionsEnabled: false,
+                httpsOnlyMode: false,
+                autoClearCookieDomains: []
             }
         });
     }

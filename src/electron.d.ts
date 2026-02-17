@@ -87,6 +87,24 @@ declare global {
             // Session
             invoke(channel: 'session:clear'): Promise<boolean>;
 
+            // Tracker Dashboard
+            invoke(channel: 'adblocker:get-tab-stats', tabId: string): Promise<{ total: number; byCategory: { ads: number; analytics: number; fingerprinting: number; social: number }; blockedDomains: string[] }>;
+            invoke(channel: 'adblocker:get-all-stats'): Promise<Array<{ domain: string; total: number; byCategory: { ads: number; analytics: number; fingerprinting: number; social: number }; lastBlocked: number }>>;
+            invoke(channel: 'adblocker:clear-stats'): Promise<boolean>;
+
+            // Certificate Viewer
+            invoke(channel: 'security:get-certificate', tabId: string): Promise<{ subject: string; issuer: string; validFrom: string; validTo: string; fingerprint: string; serialNumber: string; isSelfSigned: boolean; isExpired: boolean; isExpiringSoon: boolean } | null>;
+
+            // Cookie Manager
+            invoke(channel: 'cookies:get-all'): Promise<any[]>;
+            invoke(channel: 'cookies:get-for-domain', domain: string): Promise<any[]>;
+            invoke(channel: 'cookies:delete', url: string, name: string): Promise<boolean>;
+            invoke(channel: 'cookies:clear-domain', domain: string): Promise<boolean>;
+            invoke(channel: 'cookies:clear-all'): Promise<boolean>;
+
+            // Container Tabs
+            invoke(channel: 'tabs:set-group-container', groupId: string, enable: boolean, name?: string): Promise<boolean>;
+
             invoke(channel: string, ...args: any[]): Promise<any>;
 
             on(channel: 'tab-updated', func: (data: { id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; pinned?: boolean; muted?: boolean; suspended?: boolean }) => void): void;
@@ -98,6 +116,7 @@ declare global {
             on(channel: 'shortcut:from-browserview', func: (data: { key: string; meta: boolean; shift: boolean; alt: boolean }) => void): void;
             on(channel: 'ai:translation-complete', func: (data: { lang: string }) => void): void;
             on(channel: 'ai:translation-error', func: (data: { error: string }) => void): void;
+            on(channel: 'privacy:tab-stats-updated', func: (data: { tabId: string; stats: { total: number; byCategory: { ads: number; analytics: number; fingerprinting: number; social: number } } }) => void): void;
             on(channel: string, func: (...args: any[]) => void): void;
             removeListener(channel: string, func: (...args: any[]) => void): void;
         };

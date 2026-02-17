@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, BrowserView, ipcMain, Menu, MenuItem, dialog } from 'electron';
+import { app, BrowserWindow, BrowserView, ipcMain, Menu, MenuItem, dialog, session } from 'electron';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { TabManager } from './TabManager';
@@ -22,7 +22,8 @@ import { SyncManager } from './managers/SyncManager';
 
 const adBlockerManager = new AdBlockerManager();
 
-// ... existing code
+// Certificate cache for certificate viewer
+const certCache = new Map<string, Electron.Certificate>();
 
 ipcMain.handle('adblocker:toggle', () => {
     return adBlockerManager.toggle();
@@ -30,6 +31,84 @@ ipcMain.handle('adblocker:toggle', () => {
 
 ipcMain.handle('adblocker:status', () => {
     return adBlockerManager.getStatus();
+});
+
+ipcMain.handle('adblocker:get-tab-stats', async (event, tabId: string) => {
+    return adBlockerManager.getTabStats(tabId);
+});
+
+ipcMain.handle('adblocker:get-all-stats', async () => {
+    return adBlockerManager.getAllSiteStats();
+});
+
+ipcMain.handle('adblocker:clear-stats', async () => {
+    adBlockerManager.clearAllStats();
+    return true;
+});
+
+// Certificate Viewer IPC
+ipcMain.handle('security:get-certificate', async (event, tabId: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return null;
+
+    const tabs = tm.getTabs();
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || !tab.url) return null;
+
+    try {
+        const hostname = new URL(tab.url).hostname;
+        const cert = certCache.get(hostname);
+        if (!cert) return null;
+
+        const validFrom = new Date(cert.validStart * 1000);
+        const validTo = new Date(cert.validExpiry * 1000);
+        const now = new Date();
+        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+        return {
+            subject: cert.subjectName,
+            issuer: cert.issuerName,
+            validFrom: validFrom.toLocaleDateString(),
+            validTo: validTo.toLocaleDateString(),
+            fingerprint: cert.fingerprint,
+            serialNumber: cert.serialNumber,
+            isSelfSigned: cert.subjectName === cert.issuerName,
+            isExpired: now > validTo,
+            isExpiringSoon: !!(validTo.getTime() - now.getTime() < thirtyDays && now < validTo),
+        };
+    } catch {
+        return null;
+    }
+});
+
+// Cookie Manager IPC
+ipcMain.handle('cookies:get-all', async () => {
+    return session.defaultSession.cookies.get({});
+});
+
+ipcMain.handle('cookies:get-for-domain', async (_event, domain: string) => {
+    return session.defaultSession.cookies.get({ domain });
+});
+
+ipcMain.handle('cookies:delete', async (_event, url: string, name: string) => {
+    await session.defaultSession.cookies.remove(url, name);
+    return true;
+});
+
+ipcMain.handle('cookies:clear-domain', async (_event, domain: string) => {
+    const cookies = await session.defaultSession.cookies.get({ domain });
+    for (const cookie of cookies) {
+        const protocol = cookie.secure ? 'https' : 'http';
+        const cookieDomain = cookie.domain?.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+        const url = `${protocol}://${cookieDomain}${cookie.path}`;
+        await session.defaultSession.cookies.remove(url, cookie.name);
+    }
+    return true;
+});
+
+ipcMain.handle('cookies:clear-all', async () => {
+    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
+    return true;
 });
 
 // Manage multiple windows and their respective TabManagers
@@ -186,8 +265,31 @@ function createWindow(options: { incognito?: boolean, initialTabs?: { url: strin
     });
     tabManagers.set(windowId, tabManager);
 
-    // Update download manager to track this window (simplified for now, might need better multi-window handling)
+    // Update download manager to track this window
     downloadManager.setMainWindow(window);
+
+    // Wire AdBlockerManager to this window
+    adBlockerManager.setMainWindow(window);
+    adBlockerManager.setTabIdResolver((webContentsId: number) => {
+        for (const [, tm] of tabManagers) {
+            const tabId = tm.getTabIdByWebContentsId(webContentsId);
+            if (tabId) return tabId;
+        }
+        return null;
+    });
+
+    // Wire tab navigate callback to clear per-tab stats on navigation
+    tabManager.setOnTabNavigate((tabId: string) => {
+        adBlockerManager.clearTabStats(tabId);
+    });
+
+    // Cache certificates for the certificate viewer
+    window.webContents.session.setCertificateVerifyProc((request, callback) => {
+        if (request.certificate) {
+            certCache.set(request.hostname, request.certificate);
+        }
+        callback(0); // Use default verification
+    });
 
     // Handle permissions with prompt UI
     window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -349,6 +451,31 @@ ipcMain.handle('close-tab', async (event, tabId: string) => {
     const tm = getTabManager(event);
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!tm || !win) return;
+
+    // Auto-clear cookies for configured domains
+    const autoClearDomains = settingsManager.get('autoClearCookieDomains') || [];
+    if (autoClearDomains.length > 0) {
+        const tabs = tm.getTabs();
+        const tab = tabs.find(t => t.id === tabId);
+        if (tab && tab.url) {
+            try {
+                const tabDomain = new URL(tab.url).hostname;
+                for (const domain of autoClearDomains) {
+                    if (tabDomain.endsWith(domain)) {
+                        const cookies = await session.defaultSession.cookies.get({ domain });
+                        for (const cookie of cookies) {
+                            const protocol = cookie.secure ? 'https' : 'http';
+                            const cookieDomain = cookie.domain?.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
+                            const url = `${protocol}://${cookieDomain}${cookie.path}`;
+                            await session.defaultSession.cookies.remove(url, cookie.name);
+                        }
+                        break;
+                    }
+                }
+            } catch {}
+        }
+    }
+
     tm.closeTab(win, tabId);
 });
 
@@ -920,10 +1047,10 @@ ipcMain.handle('reader:status', async (event) => {
 });
 
 // Tab Groups IPC
-ipcMain.handle('tabs:create-group', async (event, name: string, color: string) => {
+ipcMain.handle('tabs:create-group', async (event, name: string, color: string, isContainer?: boolean) => {
     const tm = getTabManager(event);
     if (!tm) return null;
-    return tm.createGroup(name, color);
+    return tm.createGroup(name, color, isContainer || false);
 });
 
 ipcMain.handle('tabs:add-to-group', async (event, tabId: string, groupId: string) => {
@@ -948,6 +1075,12 @@ ipcMain.handle('tabs:delete-group', async (event, groupId: string) => {
     const tm = getTabManager(event);
     if (!tm) return false;
     return tm.deleteGroup(groupId);
+});
+
+ipcMain.handle('tabs:set-group-container', async (event, groupId: string, enable: boolean, name?: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+    return tm.setGroupContainer(groupId, enable, name);
 });
 
 // Tab Context Menu

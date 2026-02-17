@@ -11,6 +11,8 @@ import FindInPage from './components/FindInPage';
 import PermissionPrompt from './components/PermissionPrompt';
 import Omnibar from './components/Omnibar';
 import { SiteSettingsPage } from './components/SiteSettingsPage';
+import PrivacyPage from './components/PrivacyPage';
+import CookiesPage from './components/CookiesPage';
 
 interface Tab {
   id: string;
@@ -363,6 +365,8 @@ function App() {
   const isBookmarksPage = currentUrl === 'neuralweb://bookmarks';
   const isHistoryPage = currentUrl === 'neuralweb://history';
   const isSiteSettingsPage = currentUrl === 'neuralweb://settings/site';
+  const isPrivacyPage = currentUrl === 'neuralweb://privacy';
+  const isCookiesPage = currentUrl === 'neuralweb://cookies';
 
   console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage, isHistoryPage });
 
@@ -396,7 +400,9 @@ function App() {
         {isBookmarksPage && <BookmarksPage onNavigate={handleNavigate} />}
         {isHistoryPage && <HistoryPage onNavigate={handleNavigate} />}
         {isSiteSettingsPage && <SiteSettingsPage />}
-        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && !isSiteSettingsPage && (
+        {isPrivacyPage && <PrivacyPage />}
+        {isCookiesPage && <CookiesPage />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && !isSiteSettingsPage && !isPrivacyPage && !isCookiesPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>

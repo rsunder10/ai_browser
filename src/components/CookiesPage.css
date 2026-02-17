@@ -1,0 +1,286 @@
+.cookies-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f8f9fa;
+    color: #202124;
+    padding: 40px;
+    overflow: hidden;
+}
+
+.cookies-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+}
+
+.cookies-header h1 {
+    font-size: 22px;
+    margin: 0;
+    color: #1a73e8;
+}
+
+.cookies-layout {
+    display: flex;
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+    flex: 1;
+    overflow: hidden;
+}
+
+.cookies-sidebar {
+    width: 260px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.cookies-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.cookies-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: #202124;
+    background: transparent;
+}
+
+.cookies-search svg {
+    color: #5f6368;
+}
+
+.domain-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.domain-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.domain-item:hover {
+    background: #f1f3f4;
+}
+
+.domain-item.active {
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.domain-name {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.domain-count {
+    font-size: 11px;
+    background: #e8eaed;
+    color: #5f6368;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.domain-item.active .domain-count {
+    background: #c2d7f5;
+    color: #1a73e8;
+}
+
+.domain-empty {
+    padding: 20px;
+    text-align: center;
+    color: #5f6368;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.cookies-detail {
+    flex: 1;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookies-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.cookies-detail-header h2 {
+    font-size: 16px;
+    margin: 0;
+    color: #202124;
+}
+
+.auto-clear-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5f6368;
+    cursor: pointer;
+}
+
+.auto-clear-toggle input {
+    width: auto;
+}
+
+.clear-domain-btn {
+    padding: 6px 12px;
+    background: #ffffff;
+    border: 1px solid #dadce0;
+    color: #e74c3c;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.clear-domain-btn:hover {
+    background: #fce8e6;
+}
+
+.cookies-table {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.cookies-table-header {
+    display: flex;
+    padding: 10px 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5f6368;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #f1f3f4;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+}
+
+.cookies-table-row {
+    display: flex;
+    padding: 8px 20px;
+    border-bottom: 1px solid #f8f9fa;
+    align-items: center;
+    font-size: 12px;
+}
+
+.cookies-table-row:hover {
+    background: #f8f9fa;
+}
+
+.cookie-col-name {
+    width: 160px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cookie-col-value {
+    width: 200px;
+    color: #5f6368;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.cookie-col-path {
+    width: 60px;
+    color: #5f6368;
+}
+
+.cookie-col-flags {
+    width: 120px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.cookie-flag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #e8f0fe;
+    color: #1a73e8;
+    font-weight: 500;
+}
+
+.cookie-col-expires {
+    width: 100px;
+    color: #5f6368;
+}
+
+.cookie-col-action {
+    width: 40px;
+    text-align: center;
+}
+
+.cookie-delete-btn {
+    background: none;
+    border: none;
+    color: #5f6368;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.cookie-delete-btn:hover {
+    background: #fce8e6;
+    color: #e74c3c;
+}
+
+.cookies-detail-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.cookies-detail-empty p {
+    font-size: 14px;
+    color: #5f6368;
+}

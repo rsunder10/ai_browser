@@ -7,6 +7,8 @@ interface SettingsData {
     homePage: string;
     aiModel: string;
     aiSuggestionsEnabled: boolean;
+    httpsOnlyMode: boolean;
+    autoClearCookieDomains: string[];
 }
 
 export default function SettingsPage() {
@@ -15,7 +17,9 @@ export default function SettingsPage() {
         theme: 'system',
         homePage: 'neuralweb://home',
         aiModel: 'llama3.2:1b',
-        aiSuggestionsEnabled: false
+        aiSuggestionsEnabled: false,
+        httpsOnlyMode: false,
+        autoClearCookieDomains: []
     });
     const [aiStatus, setAiStatus] = useState<{ status: string; error: string | null }>({ status: 'unknown', error: null });
     const [aiModels, setAiModels] = useState<Array<{ name: string; size: number }>>([]);
@@ -226,6 +230,21 @@ export default function SettingsPage() {
                 <section id="privacy" className="settings-section">
                     <h2><Shield size={20} /> Privacy & Security</h2>
                     <div className="setting-item">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                                type="checkbox"
+                                id="httpsOnly"
+                                checked={settings.httpsOnlyMode}
+                                onChange={(e) => updateSetting('httpsOnlyMode', e.target.checked)}
+                                style={{ width: 'auto', maxWidth: 'none' }}
+                            />
+                            <label htmlFor="httpsOnly" style={{ margin: 0 }}>HTTPS-Only Mode</label>
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#5f6368', marginTop: '4px' }}>
+                            Automatically upgrade HTTP connections to HTTPS. Shows a warning for sites that don't support HTTPS.
+                        </p>
+                    </div>
+                    <div className="setting-item">
                         <div className="setting-info">
                             <label>Site Settings</label>
                             <p>Manage permissions for sites you visit</p>
@@ -235,6 +254,30 @@ export default function SettingsPage() {
                             onClick={() => window.location.href = 'neuralweb://settings/site'}
                         >
                             Manage Permissions
+                        </button>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Cookies</label>
+                            <p>View and manage cookies stored by websites</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={() => window.location.href = 'neuralweb://cookies'}
+                        >
+                            Manage Cookies
+                        </button>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Tracker Dashboard</label>
+                            <p>View blocked trackers and ad statistics</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={() => window.location.href = 'neuralweb://privacy'}
+                        >
+                            View Dashboard
                         </button>
                     </div>
                 </section>

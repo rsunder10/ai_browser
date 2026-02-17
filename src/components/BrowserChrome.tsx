@@ -89,6 +89,7 @@ export default function BrowserChrome({
                     currentUrl={currentUrl}
                     pageTitle={activeTab?.title || ''}
                     onNavigate={onNavigate}
+                    activeTabId={activeTabId}
                 />
                 {isIncognito && (
                     <div className="incognito-badge" title="Incognito Mode">
