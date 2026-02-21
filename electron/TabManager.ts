@@ -5,6 +5,7 @@ import { SettingsManager } from './managers/SettingsManager';
 import { HistoryManager } from './managers/HistoryManager';
 import { PasswordManager } from './managers/PasswordManager';
 import { SessionManager } from './managers/SessionManager';
+import { Store } from './utils/Store';
 
 interface TabGroup {
     id: string;
@@ -41,6 +42,7 @@ export class TabManager {
     private passwordManager: PasswordManager;
     private sessionManager: SessionManager;
     private visitCounts: Map<string, { count: number; favicon?: string; title?: string }> = new Map();
+    private visitCountsStore: Store<{ domains: Record<string, { count: number; favicon?: string; title?: string }> }>;
     private onExplainText?: (text: string) => void;
     private onTranslateRequest?: (tabId: string, targetLang: string) => void;
     private readonly CHROME_HEIGHT = 100;
@@ -58,6 +60,11 @@ export class TabManager {
         this.historyManager = historyManager;
         this.passwordManager = new PasswordManager();
         this.sessionManager = sessionManager;
+        this.visitCountsStore = new Store({
+            configName: 'visit-counts',
+            defaults: { domains: {} }
+        });
+        this.loadVisitCounts();
         this.startSuspensionCheck();
     }
 
@@ -789,8 +796,20 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
         return results;
     }
 
-    private async loadVisitCounts() {
-        // Load visit counts from disk if persistence is implemented
+    private loadVisitCounts() {
+        const data = this.visitCountsStore.get('domains');
+        for (const [domain, entry] of Object.entries(data)) {
+            this.visitCounts.set(domain, entry);
+        }
+        this.log('Loaded visit counts for', this.visitCounts.size, 'domains');
+    }
+
+    private saveVisitCounts() {
+        const domains: Record<string, { count: number; favicon?: string; title?: string }> = {};
+        for (const [domain, entry] of this.visitCounts.entries()) {
+            domains[domain] = entry;
+        }
+        this.visitCountsStore.set('domains', domains);
     }
 
     recordNavigation(url: string) {
@@ -805,6 +824,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
                 count: current.count + 1
             });
             this.log('Recorded visit for:', domain, 'Count:', current.count + 1);
+            this.saveVisitCounts();
 
             this.historyManager.addEntry({
                 url: url,
@@ -829,6 +849,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
                     title: metadata.title || current.title,
                     favicon: metadata.favicon || current.favicon
                 });
+                this.saveVisitCounts();
             }
 
             this.historyManager.updateLastEntry(url, metadata);
