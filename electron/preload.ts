@@ -93,6 +93,18 @@ contextBridge.exposeInMainWorld('electron', {
             'ai:organize-tabs',
             'ai:multi-tab-stream',
             'ai:translate-page',
+            'reading-list:get',
+            'reading-list:add',
+            'reading-list:remove',
+            'reading-list:toggle-read',
+            'reading-list:check',
+            'workspaces:get-all',
+            'workspaces:get-active',
+            'workspaces:save-current',
+            'workspaces:update-current',
+            'workspaces:load',
+            'workspaces:remove',
+            'tabs:reorder',
         ];
 
         if (validChannels.includes(channel)) {

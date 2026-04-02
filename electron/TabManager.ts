@@ -751,6 +751,20 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
         return tab ? tab.view : null;
     }
 
+    reorderTab(tabId: string, targetIndex: number): boolean {
+        const entries = Array.from(this.tabs.entries());
+        const currentIndex = entries.findIndex(([id]) => id === tabId);
+        if (currentIndex === -1 || targetIndex < 0 || targetIndex >= entries.length) return false;
+        if (currentIndex === targetIndex) return true;
+
+        const [removed] = entries.splice(currentIndex, 1);
+        entries.splice(targetIndex, 0, removed);
+
+        this.tabs = new Map(entries);
+        this.sendTabsListChanged();
+        return true;
+    }
+
 
     getActiveTabId(): string | null {
         return this.activeTabId;

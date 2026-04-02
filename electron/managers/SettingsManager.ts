@@ -3,6 +3,8 @@ import { Store } from '../utils/Store';
 export interface Settings {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
     theme: 'system' | 'light' | 'dark';
+    accentColor: string;
+    themePreset: 'default' | 'ocean' | 'forest' | 'sunset' | 'midnight';
     homePage: string;
     aiModel: string;
     aiSuggestionsEnabled: boolean;
@@ -19,6 +21,8 @@ export class SettingsManager {
             defaults: {
                 searchEngine: 'google',
                 theme: 'system',
+                accentColor: '#1a73e8',
+                themePreset: 'default',
                 homePage: 'neuralweb://home',
                 aiModel: 'llama3.2:1b',
                 aiSuggestionsEnabled: false,

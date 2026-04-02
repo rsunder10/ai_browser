@@ -17,6 +17,8 @@ import { ReaderManager } from './managers/ReaderManager';
 import { AdBlockerManager } from './managers/AdBlockerManager';
 import { OllamaManager } from './managers/OllamaManager';
 import { SyncManager } from './managers/SyncManager';
+import { ReadingListManager } from './managers/ReadingListManager';
+import { WorkspaceManager } from './managers/WorkspaceManager';
 
 // ... existing imports
 
@@ -127,6 +129,8 @@ const ollamaManager = new OllamaManager();
 const aiManager = new AIManager(ollamaManager, settingsManager);
 const readerManager = new ReaderManager();
 const syncManager = new SyncManager(bookmarksManager, historyManager, settingsManager);
+const readingListManager = new ReadingListManager();
+const workspaceManager = new WorkspaceManager();
 
 // Permission request handling
 interface PendingPermission {
@@ -600,6 +604,18 @@ ipcMain.handle('open-browser-menu', async (event) => {
                 }
             }
         },
+        {
+            label: 'Reading List',
+            click: () => {
+                const tm = getTabManager(event);
+                if (tm) {
+                    const activeTabId = tm.getActiveTabId();
+                    if (activeTabId) {
+                        tm.navigateTab(activeTabId, 'neuralweb://reading-list');
+                    }
+                }
+            }
+        },
         { type: 'separator' },
         {
             label: 'Settings',
@@ -838,6 +854,8 @@ app.on('before-quit', () => {
     sessionManager.flushSync();
     permissionsManager.flushSync();
     bookmarksManager.flushSync();
+    readingListManager.flushSync();
+    workspaceManager.flushSync();
 
     ollamaManager.stop().catch(err => console.error('[Main] Ollama stop failed:', err));
 });
@@ -1239,4 +1257,94 @@ ipcMain.handle('sync:import', async (event, { strategy }: { strategy: 'merge' | 
         console.error('[Sync] Import failed:', error);
         return { success: false };
     }
+});
+
+// Reading List IPC
+ipcMain.handle('reading-list:get', async () => {
+    return readingListManager.getAll();
+});
+
+ipcMain.handle('reading-list:add', async (event, item: { url: string; title: string; excerpt?: string }) => {
+    return readingListManager.add(item);
+});
+
+ipcMain.handle('reading-list:remove', async (event, id: string) => {
+    return readingListManager.remove(id);
+});
+
+ipcMain.handle('reading-list:toggle-read', async (event, id: string) => {
+    return readingListManager.toggleRead(id);
+});
+
+ipcMain.handle('reading-list:check', async (event, url: string) => {
+    return readingListManager.isInList(url);
+});
+
+// Workspace IPC
+ipcMain.handle('workspaces:get-all', async () => {
+    return workspaceManager.getAll();
+});
+
+ipcMain.handle('workspaces:get-active', async () => {
+    return workspaceManager.getActiveId();
+});
+
+ipcMain.handle('workspaces:save-current', async (event, name: string, icon: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return null;
+
+    const tabs = tm.getTabs().map(t => ({ url: t.url, title: t.title, groupId: t.groupId }));
+    const groups = tm.getGroups().map((g: any) => ({ id: g.id, name: g.name, color: g.color }));
+    return workspaceManager.save(name, icon, tabs, groups);
+});
+
+ipcMain.handle('workspaces:update-current', async (event, id: string) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+
+    const tabs = tm.getTabs().map(t => ({ url: t.url, title: t.title, groupId: t.groupId }));
+    const groups = tm.getGroups().map((g: any) => ({ id: g.id, name: g.name, color: g.color }));
+    return workspaceManager.update(id, tabs, groups);
+});
+
+ipcMain.handle('workspaces:load', async (event, id: string) => {
+    const tm = getTabManager(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!tm || !win) return false;
+
+    const workspace = workspaceManager.get(id);
+    if (!workspace) return false;
+
+    // Close all existing tabs
+    const currentTabs = tm.getTabs();
+    for (const tab of currentTabs) {
+        tm.closeTab(win, tab.id);
+    }
+
+    // Restore groups
+    for (const group of workspace.groups) {
+        tm.restoreGroup(group);
+    }
+
+    // Restore tabs
+    for (const tab of workspace.tabs) {
+        const tabId = await tm.createTab(win, tab.url);
+        if (tab.groupId) {
+            tm.addTabToGroup(tabId, tab.groupId);
+        }
+    }
+
+    workspaceManager.setActiveId(id);
+    return true;
+});
+
+ipcMain.handle('workspaces:remove', async (event, id: string) => {
+    return workspaceManager.remove(id);
+});
+
+// Tab reorder IPC
+ipcMain.handle('tabs:reorder', async (event, tabId: string, targetIndex: number) => {
+    const tm = getTabManager(event);
+    if (!tm) return false;
+    return tm.reorderTab(tabId, targetIndex);
 });

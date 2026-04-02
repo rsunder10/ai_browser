@@ -13,6 +13,7 @@ import Omnibar from './components/Omnibar';
 import { SiteSettingsPage } from './components/SiteSettingsPage';
 import PrivacyPage from './components/PrivacyPage';
 import CookiesPage from './components/CookiesPage';
+import ReadingListPage from './components/ReadingListPage';
 
 interface Tab {
   id: string;
@@ -35,7 +36,34 @@ function App() {
   const [isIncognito, setIsIncognito] = useState(false);
   const [pendingExplainText, setPendingExplainText] = useState<string | null>(null);
   const [translationNotice, setTranslationNotice] = useState<string | null>(null);
+  const [themePreset, setThemePreset] = useState('default');
   const initialized = useRef(false);
+
+  // Apply theme settings
+  useEffect(() => {
+    const applyTheme = async () => {
+      if (!window.electron) return;
+      const settings = await window.electron.invoke('settings:get');
+      if (!settings) return;
+
+      const root = document.documentElement;
+      root.style.setProperty('--accent-color', settings.accentColor || '#1a73e8');
+
+      const presets: Record<string, { bg: string; surface: string; border: string }> = {
+        default: { bg: '#202124', surface: '#292a2d', border: '#3c4043' },
+        ocean: { bg: '#0f172a', surface: '#1e293b', border: '#334155' },
+        forest: { bg: '#14210f', surface: '#1a2e14', border: '#2d4a22' },
+        sunset: { bg: '#1c1413', surface: '#2a1f1b', border: '#3d2e27' },
+        midnight: { bg: '#0a0a1a', surface: '#141428', border: '#252547' },
+      };
+      const preset = presets[settings.themePreset || 'default'] || presets.default;
+      root.style.setProperty('--bg-primary', preset.bg);
+      root.style.setProperty('--bg-surface', preset.surface);
+      root.style.setProperty('--border-color', preset.border);
+      setThemePreset(settings.themePreset || 'default');
+    };
+    applyTheme();
+  }, []);
 
   // Load tabs on mount
   useEffect(() => {
@@ -367,6 +395,7 @@ function App() {
   const isSiteSettingsPage = currentUrl === 'neuralweb://settings/site';
   const isPrivacyPage = currentUrl === 'neuralweb://privacy';
   const isCookiesPage = currentUrl === 'neuralweb://cookies';
+  const isReadingListPage = currentUrl === 'neuralweb://reading-list';
 
   console.log('App Render:', { currentUrl, isHomePage, isSettingsPage, isDownloadsPage, isBookmarksPage, isHistoryPage });
 
@@ -402,7 +431,8 @@ function App() {
         {isSiteSettingsPage && <SiteSettingsPage />}
         {isPrivacyPage && <PrivacyPage />}
         {isCookiesPage && <CookiesPage />}
-        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && !isSiteSettingsPage && !isPrivacyPage && !isCookiesPage && (
+        {isReadingListPage && <ReadingListPage onNavigate={handleNavigate} />}
+        {!isHomePage && !isSettingsPage && !isDownloadsPage && !isBookmarksPage && !isHistoryPage && !isSiteSettingsPage && !isPrivacyPage && !isCookiesPage && !isReadingListPage && (
           <div className="web-content-placeholder">
             {/* BrowserView is overlaid here by Electron */}
           </div>

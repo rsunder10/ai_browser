@@ -5,7 +5,8 @@ import NavigationControls from './NavigationControls';
 import AddressBar from './AddressBar';
 import BookmarksBar from './BookmarksBar';
 import BrowserMenu from './BrowserMenu';
-import { Download, Book, EyeOff, Puzzle, Sparkles } from 'lucide-react';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
+import { Download, Book, EyeOff, Puzzle, Sparkles, Layers, BookOpen } from 'lucide-react';
 
 interface Tab {
     id: string;
@@ -58,6 +59,7 @@ export default function BrowserChrome({
 
     const [isIncognito, setIsIncognito] = useState(false);
     const [extensionActions, setExtensionActions] = useState<ExtensionAction[]>([]);
+    const [showWorkspaces, setShowWorkspaces] = useState(false);
 
     useEffect(() => {
         if (window.electron) {
@@ -120,6 +122,20 @@ export default function BrowserChrome({
                 )}
                 <button
                     className="settings-btn"
+                    onClick={() => setShowWorkspaces(true)}
+                    title="Workspaces"
+                >
+                    <Layers size={18} />
+                </button>
+                <button
+                    className="settings-btn"
+                    onClick={() => onNavigate('neuralweb://reading-list')}
+                    title="Reading List"
+                >
+                    <BookOpen size={18} />
+                </button>
+                <button
+                    className="settings-btn"
                     onClick={() => onNavigate('neuralweb://downloads')}
                     title="Downloads"
                 >
@@ -135,6 +151,11 @@ export default function BrowserChrome({
                 <BrowserMenu onNavigate={onNavigate} />
             </div>
             <BookmarksBar onNavigate={onNavigate} />
+
+            <WorkspaceSwitcher
+                isOpen={showWorkspaces}
+                onClose={() => setShowWorkspaces(false)}
+            />
         </div>
     );
 }

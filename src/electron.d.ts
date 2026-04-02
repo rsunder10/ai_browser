@@ -105,6 +105,24 @@ declare global {
             // Container Tabs
             invoke(channel: 'tabs:set-group-container', groupId: string, enable: boolean, name?: string): Promise<boolean>;
 
+            // Tab reorder
+            invoke(channel: 'tabs:reorder', tabId: string, targetIndex: number): Promise<boolean>;
+
+            // Reading List
+            invoke(channel: 'reading-list:get'): Promise<Array<{ id: string; url: string; title: string; excerpt?: string; dateAdded: number; isRead: boolean }>>;
+            invoke(channel: 'reading-list:add', item: { url: string; title: string; excerpt?: string }): Promise<any>;
+            invoke(channel: 'reading-list:remove', id: string): Promise<boolean>;
+            invoke(channel: 'reading-list:toggle-read', id: string): Promise<boolean>;
+            invoke(channel: 'reading-list:check', url: string): Promise<boolean>;
+
+            // Workspaces
+            invoke(channel: 'workspaces:get-all'): Promise<Array<{ id: string; name: string; icon: string; tabs: Array<{ url: string; title: string; groupId?: string }>; groups: Array<{ id: string; name: string; color: string }>; createdAt: number; updatedAt: number }>>;
+            invoke(channel: 'workspaces:get-active'): Promise<string | null>;
+            invoke(channel: 'workspaces:save-current', name: string, icon: string): Promise<any>;
+            invoke(channel: 'workspaces:update-current', id: string): Promise<boolean>;
+            invoke(channel: 'workspaces:load', id: string): Promise<boolean>;
+            invoke(channel: 'workspaces:remove', id: string): Promise<boolean>;
+
             invoke(channel: string, ...args: any[]): Promise<any>;
 
             on(channel: 'tab-updated', func: (data: { id: string; url: string; title: string; history: string[]; historyIndex: number; groupId?: string; pinned?: boolean; muted?: boolean; suspended?: boolean }) => void): void;

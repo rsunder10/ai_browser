@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Lock, Star, BookOpen, Shield, X } from 'lucide-react';
+import { Lock, Star, BookOpen, Shield, X, ListPlus } from 'lucide-react';
 
 interface AddressBarProps {
     currentUrl: string;
@@ -16,6 +16,7 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate, activeTa
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [bookmarkId, setBookmarkId] = useState<string | null>(null);
     const [isAdBlockerEnabled, setIsAdBlockerEnabled] = useState(false);
+    const [isInReadingList, setIsInReadingList] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -35,6 +36,7 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate, activeTa
         checkBookmarkStatus();
         checkAdBlockerStatus();
         fetchBlockedCount();
+        checkReadingListStatus();
     }, [currentUrl]);
 
     // Listen for tracker stats push events
@@ -128,6 +130,29 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate, activeTa
         } catch (error) {
             console.error('Failed to toggle bookmark:', error);
         }
+    };
+
+    const checkReadingListStatus = async () => {
+        if (window.electron && currentUrl && !currentUrl.startsWith('neuralweb://')) {
+            try {
+                const inList = await window.electron.invoke('reading-list:check', currentUrl);
+                setIsInReadingList(inList);
+            } catch {
+                setIsInReadingList(false);
+            }
+        } else {
+            setIsInReadingList(false);
+        }
+    };
+
+    const handleReadingListClick = async () => {
+        if (!window.electron || !currentUrl || currentUrl.startsWith('neuralweb://')) return;
+        if (isInReadingList) return; // Already in list
+        await window.electron.invoke('reading-list:add', {
+            url: currentUrl,
+            title: pageTitle || inputValue,
+        });
+        setIsInReadingList(true);
     };
 
     const toggleAdBlocker = async () => {
@@ -271,6 +296,18 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate, activeTa
             >
                 <BookOpen size={16} />
             </button>
+            {!currentUrl.startsWith('neuralweb://') && (
+                <button
+                    className="bookmark-btn"
+                    title={isInReadingList ? "In Reading List" : "Save to Reading List"}
+                    onClick={handleReadingListClick}
+                >
+                    <ListPlus
+                        size={16}
+                        color={isInReadingList ? "#34a853" : "currentColor"}
+                    />
+                </button>
+            )}
             <button
                 className="bookmark-btn"
                 title={isBookmarked ? "Remove bookmark" : "Bookmark this tab"}

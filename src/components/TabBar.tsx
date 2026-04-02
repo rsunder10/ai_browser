@@ -1,6 +1,6 @@
 
 import { X, Plus, Folder, Pin, VolumeX, Sparkles, Container } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Tab {
     id: string;
@@ -136,6 +136,51 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
         }
     };
 
+    // Drag & drop state
+    const [dragTabId, setDragTabId] = useState<string | null>(null);
+    const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+    const dragRef = useRef<{ startX: number; tabId: string } | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, tabId: string) => {
+        setDragTabId(tabId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', tabId);
+        // Make the drag image semi-transparent
+        if (e.currentTarget instanceof HTMLElement) {
+            e.currentTarget.style.opacity = '0.5';
+        }
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        if (e.currentTarget instanceof HTMLElement) {
+            e.currentTarget.style.opacity = '1';
+        }
+        setDragTabId(null);
+        setDropTargetId(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent, tabId: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (tabId !== dragTabId) {
+            setDropTargetId(tabId);
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetTabId: string) => {
+        e.preventDefault();
+        const sourceTabId = e.dataTransfer.getData('text/plain');
+        if (!sourceTabId || sourceTabId === targetTabId) return;
+
+        // Find target index in the full tabs array
+        const targetIndex = tabs.findIndex(t => t.id === targetTabId);
+        if (targetIndex !== -1 && window.electron) {
+            await window.electron.invoke('tabs:reorder', sourceTabId, targetIndex);
+        }
+        setDragTabId(null);
+        setDropTargetId(null);
+    };
+
     // Group tabs by groupId
     const groupIds = new Set(groups.map(g => g.id));
     const ungroupedTabs = tabs.filter(tab => !tab.groupId || !groupIds.has(tab.groupId));
@@ -153,7 +198,12 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                 {ungroupedTabs.map((tab) => (
                     <div
                         key={tab.id}
-                        className={`tab ${tab.id === activeTabId ? 'active' : ''}`}
+                        className={`tab ${tab.id === activeTabId ? 'active' : ''} ${dropTargetId === tab.id ? 'drop-target' : ''}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, tab.id)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, tab.id)}
+                        onDrop={(e) => handleDrop(e, tab.id)}
                         onClick={() => onTabClick(tab.id)}
                         onContextMenu={(e) => {
                             e.preventDefault();
@@ -193,7 +243,12 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                         {groupTabs.map(tab => (
                             <div
                                 key={tab.id}
-                                className={`tab grouped ${tab.id === activeTabId ? 'active' : ''}`}
+                                className={`tab grouped ${tab.id === activeTabId ? 'active' : ''} ${dropTargetId === tab.id ? 'drop-target' : ''}`}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, tab.id)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={(e) => handleDragOver(e, tab.id)}
+                                onDrop={(e) => handleDrop(e, tab.id)}
                                 style={{
                                     borderLeft: `3px solid ${group.color}`,
                                     ...(group.isContainer ? { borderTop: `2px solid ${group.color}` } : {})

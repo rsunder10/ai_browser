@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, FileText, Globe, Bookmark, Command, Plus, Settings, Clock, Download, Puzzle, Trash2, ZoomIn, ZoomOut, RotateCcw, Printer, Terminal, Bot, EyeOff } from 'lucide-react';
+import { Search, FileText, Globe, Bookmark, Command, Plus, Settings, Clock, Download, Puzzle, Trash2, ZoomIn, ZoomOut, RotateCcw, Printer, Terminal, Bot, EyeOff, Shield, VolumeX, X, BookOpen, Layers, Moon } from 'lucide-react';
 import './Omnibar.css';
 
 interface Tab {
@@ -167,6 +167,10 @@ export default function Omnibar({ tabs, onTabClick, onNavigate, onNewTab, onTogg
         { id: 'cmd-devtools', category: 'command', title: 'DevTools', icon: <Terminal size={14} />, action: () => { window.electron.invoke('open-devtools'); onClose(); } },
         { id: 'cmd-ai', category: 'command', title: 'AI Assistant', icon: <Bot size={14} />, action: () => { onToggleAI(); onClose(); } },
         { id: 'cmd-incognito', category: 'command', title: 'New Incognito Window', icon: <EyeOff size={14} />, action: () => { window.electron.invoke('create-incognito-window'); onClose(); } },
+        { id: 'cmd-toggle-adblocker', category: 'command', title: 'Toggle Ad Blocker', icon: <Shield size={14} />, action: () => { window.electron.invoke('adblocker:toggle'); onClose(); } },
+        { id: 'cmd-reading-list', category: 'command', title: 'Reading List', icon: <BookOpen size={14} />, action: () => { onNavigate('neuralweb://reading-list'); onClose(); } },
+        { id: 'cmd-privacy', category: 'command', title: 'Privacy Dashboard', icon: <Shield size={14} />, action: () => { onNavigate('neuralweb://privacy'); onClose(); } },
+        { id: 'cmd-cookies', category: 'command', title: 'Manage Cookies', icon: <Settings size={14} />, action: () => { onNavigate('neuralweb://cookies'); onClose(); } },
     ];
 
     const getResults = useCallback((): ResultItem[] => {

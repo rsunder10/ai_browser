@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot, RefreshCw } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot, RefreshCw, Palette } from 'lucide-react';
 
 interface SettingsData {
     searchEngine: 'google' | 'duckduckgo' | 'bing';
     theme: 'system' | 'light' | 'dark';
+    accentColor: string;
+    themePreset: 'default' | 'ocean' | 'forest' | 'sunset' | 'midnight';
     homePage: string;
     aiModel: string;
     aiSuggestionsEnabled: boolean;
@@ -11,10 +13,31 @@ interface SettingsData {
     autoClearCookieDomains: string[];
 }
 
+const ACCENT_COLORS = [
+    { name: 'Blue', value: '#1a73e8' },
+    { name: 'Purple', value: '#8b5cf6' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Orange', value: '#f97316' },
+    { name: 'Green', value: '#10b981' },
+    { name: 'Teal', value: '#14b8a6' },
+    { name: 'Cyan', value: '#06b6d4' },
+];
+
+const THEME_PRESETS = [
+    { id: 'default', name: 'Default', bg: '#202124', accent: '#1a73e8' },
+    { id: 'ocean', name: 'Ocean', bg: '#0f172a', accent: '#0ea5e9' },
+    { id: 'forest', name: 'Forest', bg: '#14210f', accent: '#22c55e' },
+    { id: 'sunset', name: 'Sunset', bg: '#1c1413', accent: '#f97316' },
+    { id: 'midnight', name: 'Midnight', bg: '#0a0a1a', accent: '#8b5cf6' },
+];
+
 export default function SettingsPage() {
     const [settings, setSettings] = useState<SettingsData>({
         searchEngine: 'google',
         theme: 'system',
+        accentColor: '#1a73e8',
+        themePreset: 'default',
         homePage: 'neuralweb://home',
         aiModel: 'llama3.2:1b',
         aiSuggestionsEnabled: false,
@@ -147,6 +170,59 @@ export default function SettingsPage() {
                             <option value="light">Light</option>
                             <option value="dark">Dark</option>
                         </select>
+                    </div>
+                    <div className="setting-item">
+                        <label>Accent Color</label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                            {ACCENT_COLORS.map(color => (
+                                <div
+                                    key={color.value}
+                                    onClick={() => updateSetting('accentColor', color.value)}
+                                    title={color.name}
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: '50%',
+                                        background: color.value,
+                                        cursor: 'pointer',
+                                        border: settings.accentColor === color.value ? '3px solid #e8eaed' : '3px solid transparent',
+                                        boxShadow: settings.accentColor === color.value ? `0 0 0 2px ${color.value}` : 'none',
+                                        transition: 'all 0.15s',
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <label>Theme Preset</label>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                            {THEME_PRESETS.map(preset => (
+                                <div
+                                    key={preset.id}
+                                    onClick={() => {
+                                        updateSetting('themePreset', preset.id);
+                                        const p = THEME_PRESETS.find(t => t.id === preset.id);
+                                        if (p) updateSetting('accentColor', p.accent);
+                                    }}
+                                    style={{
+                                        width: 80,
+                                        padding: '10px 8px',
+                                        borderRadius: 8,
+                                        background: preset.bg,
+                                        border: settings.themePreset === preset.id ? `2px solid ${preset.accent}` : '2px solid #3c4043',
+                                        cursor: 'pointer',
+                                        textAlign: 'center',
+                                        transition: 'all 0.15s',
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 24, height: 24, borderRadius: '50%',
+                                        background: preset.accent, margin: '0 auto 6px',
+                                    }} />
+                                    <div style={{ fontSize: 11, color: '#e8eaed' }}>{preset.name}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </section>
 

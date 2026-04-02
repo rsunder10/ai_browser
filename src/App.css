@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent-color: #1a73e8;
+  --bg-primary: #202124;
+  --bg-surface: #292a2d;
+  --border-color: #3c4043;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -196,6 +203,18 @@ body {
 .tab.active::after,
 .tab:hover::after {
   display: none;
+}
+
+.tab.drop-target {
+  border-left: 2px solid var(--accent-color, #1a73e8);
+}
+
+.tab[draggable="true"] {
+  cursor: grab;
+}
+
+.tab[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .tab-title {
