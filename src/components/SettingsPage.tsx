@@ -124,7 +124,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="settings-page">
+        <div className="settings-page" data-testid="settings-page">
             <div className="settings-sidebar">
                 <div className="settings-header">
                     <Settings size={24} />
@@ -148,6 +148,7 @@ export default function SettingsPage() {
                     <div className="setting-item">
                         <label>Search engine used in the address bar</label>
                         <select
+                            data-testid="search-engine-select"
                             value={settings.searchEngine}
                             onChange={(e) => updateSetting('searchEngine', e.target.value)}
                         >

@@ -192,13 +192,15 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
 
 
     return (
-        <div className="tab-bar">
+        <div className="tab-bar" data-testid="tab-bar">
             <div className="tabs-container">
                 {/* Ungrouped tabs */}
                 {ungroupedTabs.map((tab) => (
                     <div
                         key={tab.id}
                         className={`tab ${tab.id === activeTabId ? 'active' : ''} ${dropTargetId === tab.id ? 'drop-target' : ''}`}
+                        data-testid="browser-tab"
+                        data-tab-id={tab.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, tab.id)}
                         onDragEnd={handleDragEnd}
@@ -218,6 +220,7 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                             {tab.muted && <VolumeX size={12} style={{ color: '#9aa0a6' }} />}
                             <button
                                 className="tab-close"
+                                aria-label={`Close ${tab.title || 'tab'}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onTabClose(tab.id);
@@ -244,6 +247,8 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                             <div
                                 key={tab.id}
                                 className={`tab grouped ${tab.id === activeTabId ? 'active' : ''} ${dropTargetId === tab.id ? 'drop-target' : ''}`}
+                                data-testid="browser-tab"
+                                data-tab-id={tab.id}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, tab.id)}
                                 onDragEnd={handleDragEnd}
@@ -267,6 +272,7 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                                     {tab.muted && <VolumeX size={12} style={{ color: '#9aa0a6' }} />}
                                     <button
                                         className="tab-close"
+                                        aria-label={`Close ${tab.title || 'tab'}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onTabClose(tab.id);
@@ -284,11 +290,12 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
                     className="organize-btn"
                     onClick={handleOrganize}
                     title="Organize tabs with AI"
+                    aria-label="Organize tabs with AI"
                     disabled={organizeLoading || tabs.filter(t => !t.url?.startsWith('neuralweb://')).length < 2}
                 >
                     <Sparkles size={16} />
                 </button>
-                <button className="new-tab-btn" onClick={onNewTab} title="New Tab">
+                <button className="new-tab-btn" onClick={onNewTab} title="New Tab" aria-label="New Tab" data-testid="new-tab-button">
                     <Plus size={18} />
                 </button>
             </div>

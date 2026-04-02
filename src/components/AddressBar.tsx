@@ -245,6 +245,8 @@ export default function AddressBar({ currentUrl, pageTitle, onNavigate, activeTa
             <input
                 type="text"
                 className="url-input"
+                data-testid="address-input"
+                aria-label="Address bar"
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}

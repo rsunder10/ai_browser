@@ -181,7 +181,7 @@ export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplain
     }
 
     return (
-        <div className="ai-sidebar">
+        <div className="ai-sidebar" data-testid="ai-sidebar">
             <div className="ai-header">
                 <div className="ai-header-title">
                     <div className="ai-header-icon">
@@ -325,6 +325,7 @@ export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplain
                     <textarea
                         ref={inputRef}
                         className="ai-input"
+                        data-testid="ai-input"
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
@@ -334,6 +335,7 @@ export default function AISidebar({ isOpen, onToggle, currentUrl, pendingExplain
                     />
                     <button
                         className="ai-send-btn"
+                        data-testid="ai-send-button"
                         onClick={handleSend}
                         disabled={isLoading || !input.trim()}
                         title="Send message"

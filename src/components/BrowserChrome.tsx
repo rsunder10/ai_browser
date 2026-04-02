@@ -69,7 +69,7 @@ export default function BrowserChrome({
     }, []);
 
     return (
-        <div className={`browser-chrome ${isIncognito ? 'incognito' : ''}`}>
+        <div className={`browser-chrome ${isIncognito ? 'incognito' : ''}`} data-testid="browser-chrome">
             <TabBar
                 tabs={tabs}
                 activeTabId={activeTabId}
@@ -116,6 +116,8 @@ export default function BrowserChrome({
                         className={`settings-btn ${aiSidebarOpen ? 'active' : ''}`}
                         onClick={onAIToggle}
                         title="AI Assistant"
+                        aria-label="Toggle AI Assistant"
+                        data-testid="ai-toggle-button"
                     >
                         <Sparkles size={18} />
                     </button>

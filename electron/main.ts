@@ -22,6 +22,12 @@ import { WorkspaceManager } from './managers/WorkspaceManager';
 
 // ... existing imports
 
+if (process.env.NEURALWEB_USER_DATA_DIR) {
+    app.setPath('userData', process.env.NEURALWEB_USER_DATA_DIR);
+}
+
+const shouldStartOllama = process.env.NEURALWEB_DISABLE_OLLAMA !== '1';
+
 const adBlockerManager = new AdBlockerManager();
 
 // Certificate cache for certificate viewer
@@ -824,7 +830,9 @@ ipcMain.handle('print:page', async (event) => {
 // App lifecycle
 app.whenReady().then(async () => {
     // Start Ollama sidecar in background (does not block window creation)
-    ollamaManager.start().catch(err => console.error('[Main] Ollama start failed:', err));
+    if (shouldStartOllama) {
+        ollamaManager.start().catch(err => console.error('[Main] Ollama start failed:', err));
+    }
 
     // Load extensions from saved paths
     await extensionsManager.loadExtensions();
@@ -857,7 +865,9 @@ app.on('before-quit', () => {
     readingListManager.flushSync();
     workspaceManager.flushSync();
 
-    ollamaManager.stop().catch(err => console.error('[Main] Ollama stop failed:', err));
+    if (shouldStartOllama) {
+        ollamaManager.stop().catch(err => console.error('[Main] Ollama stop failed:', err));
+    }
 });
 
 app.on('window-all-closed', () => {
