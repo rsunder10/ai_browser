@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot, RefreshCw, Palette } from 'lucide-react';
+import { Settings, Search, Monitor, Home, Shield, Puzzle, Lock, Bot, RefreshCw } from 'lucide-react';
+import {
+    SearchEngineDefinition,
+    createCustomSearchEngineId,
+    normalizeSearchSettings,
+} from '../lib/searchEngines';
 
 interface SettingsData {
-    searchEngine: 'google' | 'duckduckgo' | 'bing';
+    searchEngine: string;
+    searchEngines: SearchEngineDefinition[];
     theme: 'system' | 'light' | 'dark';
     accentColor: string;
     themePreset: 'default' | 'ocean' | 'forest' | 'sunset' | 'midnight';
@@ -32,9 +38,17 @@ const THEME_PRESETS = [
     { id: 'midnight', name: 'Midnight', bg: '#0a0a1a', accent: '#8b5cf6' },
 ];
 
+const EMPTY_SEARCH_ENGINE_DRAFT: SearchEngineDefinition = {
+    id: '',
+    name: '',
+    template: '',
+    keyword: '',
+    isBuiltIn: false,
+};
+
 export default function SettingsPage() {
     const [settings, setSettings] = useState<SettingsData>({
-        searchEngine: 'google',
+        ...normalizeSearchSettings({ searchEngine: 'google' }),
         theme: 'system',
         accentColor: '#1a73e8',
         themePreset: 'default',
@@ -42,10 +56,12 @@ export default function SettingsPage() {
         aiModel: 'llama3.2:1b',
         aiSuggestionsEnabled: false,
         httpsOnlyMode: false,
-        autoClearCookieDomains: []
+        autoClearCookieDomains: [],
     });
     const [aiStatus, setAiStatus] = useState<{ status: string; error: string | null }>({ status: 'unknown', error: null });
     const [aiModels, setAiModels] = useState<Array<{ name: string; size: number }>>([]);
+    const [searchEngineDraft, setSearchEngineDraft] = useState<SearchEngineDefinition | null>(null);
+    const [searchEngineError, setSearchEngineError] = useState('');
 
     // Sync state
     const [syncBookmarks, setSyncBookmarks] = useState(true);
@@ -62,7 +78,12 @@ export default function SettingsPage() {
     const loadSettings = async () => {
         if (window.electron) {
             const data = await window.electron.invoke('settings:get');
-            if (data) setSettings(data);
+            if (data) {
+                setSettings({
+                    ...data,
+                    ...normalizeSearchSettings(data),
+                });
+            }
         }
     };
 
@@ -85,6 +106,95 @@ export default function SettingsPage() {
             await window.electron.invoke('settings:set', key, value);
             setSettings(prev => ({ ...prev, [key]: value }));
         }
+    };
+
+    const persistSearchSettings = async (nextSettings: Pick<SettingsData, 'searchEngine' | 'searchEngines'>) => {
+        if (!window.electron) return;
+
+        const normalized = normalizeSearchSettings(nextSettings);
+        await window.electron.invoke('settings:set', 'searchEngines', normalized.searchEngines);
+        await window.electron.invoke('settings:set', 'searchEngine', normalized.searchEngine);
+        setSettings(prev => ({
+            ...prev,
+            searchEngines: normalized.searchEngines,
+            searchEngine: normalized.searchEngine,
+        }));
+    };
+
+    const startCreatingSearchEngine = () => {
+        setSearchEngineDraft({ ...EMPTY_SEARCH_ENGINE_DRAFT });
+        setSearchEngineError('');
+    };
+
+    const startEditingSearchEngine = (engine: SearchEngineDefinition) => {
+        setSearchEngineDraft({ ...engine });
+        setSearchEngineError('');
+    };
+
+    const cancelEditingSearchEngine = () => {
+        setSearchEngineDraft(null);
+        setSearchEngineError('');
+    };
+
+    const validateSearchEngine = (engine: SearchEngineDefinition) => {
+        if (!engine.name.trim()) return 'Name is required.';
+        if (!engine.template.trim()) return 'Search URL is required.';
+        if (!engine.template.includes('%s')) return 'Search URL must include %s for the query placeholder.';
+
+        const keyword = engine.keyword.trim().toLowerCase();
+        if (!keyword) return 'Keyword shortcut is required.';
+
+        const duplicateKeyword = settings.searchEngines.find((entry) =>
+            entry.id !== engine.id && entry.keyword.trim().toLowerCase() === keyword
+        );
+        if (duplicateKeyword) {
+            return `Keyword "${keyword}" is already used by ${duplicateKeyword.name}.`;
+        }
+
+        return null;
+    };
+
+    const saveSearchEngine = async () => {
+        if (!searchEngineDraft) return;
+
+        const nextEngine: SearchEngineDefinition = {
+            ...searchEngineDraft,
+            id: searchEngineDraft.id || createCustomSearchEngineId(searchEngineDraft.name),
+            name: searchEngineDraft.name.trim(),
+            template: searchEngineDraft.template.trim(),
+            keyword: searchEngineDraft.keyword.trim().toLowerCase(),
+        };
+
+        const validationError = validateSearchEngine(nextEngine);
+        if (validationError) {
+            setSearchEngineError(validationError);
+            return;
+        }
+
+        const existingIndex = settings.searchEngines.findIndex((engine) => engine.id === nextEngine.id);
+        const nextEngines = existingIndex >= 0
+            ? settings.searchEngines.map((engine) => engine.id === nextEngine.id ? nextEngine : engine)
+            : [...settings.searchEngines, nextEngine];
+
+        await persistSearchSettings({
+            searchEngine: settings.searchEngine,
+            searchEngines: nextEngines,
+        });
+
+        cancelEditingSearchEngine();
+    };
+
+    const deleteSearchEngine = async (engineId: string) => {
+        const engine = settings.searchEngines.find((entry) => entry.id === engineId);
+        if (!engine || engine.isBuiltIn) return;
+
+        const nextEngines = settings.searchEngines.filter((entry) => entry.id !== engineId);
+        const nextSelectedEngine = settings.searchEngine === engineId ? 'google' : settings.searchEngine;
+
+        await persistSearchSettings({
+            searchEngine: nextSelectedEngine,
+            searchEngines: nextEngines,
+        });
     };
 
     const handleExport = async () => {
@@ -150,13 +260,140 @@ export default function SettingsPage() {
                         <select
                             data-testid="search-engine-select"
                             value={settings.searchEngine}
-                            onChange={(e) => updateSetting('searchEngine', e.target.value)}
+                            onChange={(e) => persistSearchSettings({
+                                searchEngine: e.target.value,
+                                searchEngines: settings.searchEngines,
+                            })}
                         >
-                            <option value="google">Google</option>
-                            <option value="duckduckgo">DuckDuckGo</option>
-                            <option value="bing">Bing</option>
+                            {settings.searchEngines.map((engine) => (
+                                <option key={engine.id} value={engine.id}>{engine.name}</option>
+                            ))}
                         </select>
+                        <p style={{ fontSize: '12px', color: '#5f6368', marginTop: '6px' }}>
+                            Type a shortcut like <code>w neural networks</code> to search with a matching keyword.
+                        </p>
                     </div>
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>Manage search engines</label>
+                            <p>Add engines with a <code>%s</code> placeholder and assign keyword shortcuts.</p>
+                        </div>
+                        <button
+                            className="action-btn"
+                            onClick={startCreatingSearchEngine}
+                        >
+                            Add Search Engine
+                        </button>
+                    </div>
+                    <div className="setting-item">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {settings.searchEngines.map((engine) => (
+                                <div
+                                    key={engine.id}
+                                    style={{
+                                        padding: '12px',
+                                        borderRadius: '8px',
+                                        border: engine.id === settings.searchEngine ? '1px solid #1a73e8' : '1px solid #dfe1e5',
+                                        background: engine.id === settings.searchEngine ? '#f5f9ff' : 'white',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <strong>{engine.name}</strong>
+                                                {engine.id === settings.searchEngine && (
+                                                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: '#d2e3fc', color: '#174ea6' }}>
+                                                        Default
+                                                    </span>
+                                                )}
+                                                {engine.isBuiltIn && (
+                                                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: '#f1f3f4', color: '#5f6368' }}>
+                                                        Built-in
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <code style={{ fontSize: '12px', color: '#3c4043' }}>{engine.template}</code>
+                                            <div style={{ fontSize: '12px', color: '#5f6368' }}>
+                                                Shortcut: <code>{engine.keyword}</code>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                            {engine.id !== settings.searchEngine && (
+                                                <button
+                                                    className="action-btn"
+                                                    onClick={() => persistSearchSettings({
+                                                        searchEngine: engine.id,
+                                                        searchEngines: settings.searchEngines,
+                                                    })}
+                                                >
+                                                    Set Default
+                                                </button>
+                                            )}
+                                            <button
+                                                className="action-btn"
+                                                onClick={() => startEditingSearchEngine(engine)}
+                                            >
+                                                Edit
+                                            </button>
+                                            {!engine.isBuiltIn && (
+                                                <button
+                                                    className="action-btn"
+                                                    onClick={() => deleteSearchEngine(engine.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {searchEngineDraft && (
+                        <div className="setting-item">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', borderRadius: '8px', background: '#f8f9fa', border: '1px solid #dfe1e5' }}>
+                                <label>{searchEngineDraft.id ? 'Edit Search Engine' : 'New Search Engine'}</label>
+                                <input
+                                    type="text"
+                                    value={searchEngineDraft.name}
+                                    onChange={(e) => setSearchEngineDraft(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                                    placeholder="Search engine name"
+                                />
+                                <input
+                                    type="text"
+                                    value={searchEngineDraft.template}
+                                    onChange={(e) => setSearchEngineDraft(prev => prev ? { ...prev, template: e.target.value } : prev)}
+                                    placeholder="https://example.com/search?q=%s"
+                                />
+                                <input
+                                    type="text"
+                                    value={searchEngineDraft.keyword}
+                                    onChange={(e) => setSearchEngineDraft(prev => prev ? { ...prev, keyword: e.target.value } : prev)}
+                                    placeholder="Keyword shortcut"
+                                />
+                                <p style={{ fontSize: '12px', color: '#5f6368', margin: 0 }}>
+                                    Use <code>%s</code> where the typed query should be inserted.
+                                </p>
+                                {searchEngineError && (
+                                    <div style={{ fontSize: '12px', color: '#c5221f' }}>{searchEngineError}</div>
+                                )}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        className="action-btn"
+                                        onClick={saveSearchEngine}
+                                    >
+                                        Save Search Engine
+                                    </button>
+                                    <button
+                                        className="action-btn"
+                                        onClick={cancelEditingSearchEngine}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 <section id="appearance" className="settings-section">
@@ -461,9 +698,10 @@ export default function SettingsPage() {
 }
 
 function PasswordsList() {
-    const [passwords, setPasswords] = useState<any[]>([]);
+    const [passwords, setPasswords] = useState<Array<{ id: string; url: string; username: string }>>([]);
     const [showAdd, setShowAdd] = useState(false);
     const [newPassword, setNewPassword] = useState({ url: '', username: '', password: '' });
+    const [copyingPasswordId, setCopyingPasswordId] = useState<string | null>(null);
 
     useEffect(() => {
         loadPasswords();
@@ -492,9 +730,29 @@ function PasswordsList() {
         }
     };
 
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        alert('Password copied to clipboard!');
+    const handleCopy = async (id: string) => {
+        if (!window.electron) return;
+
+        setCopyingPasswordId(id);
+        try {
+            const copied = await window.electron.invoke('passwords:copy', id);
+            if (copied) {
+                alert('Password copied to clipboard.');
+            } else {
+                alert('Could not copy that password.');
+            }
+        } finally {
+            setCopyingPasswordId(null);
+        }
+    };
+
+    const getPasswordHost = (url: string) => {
+        try {
+            const normalizedUrl = url.includes('://') ? url : `https://${url}`;
+            return new URL(normalizedUrl).hostname;
+        } catch {
+            return url;
+        }
     };
 
     return (
@@ -548,16 +806,17 @@ function PasswordsList() {
                     passwords.map(p => (
                         <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'white', border: '1px solid #dfe1e5', borderRadius: '6px' }}>
                             <div>
-                                <div style={{ fontWeight: '500' }}>{new URL(p.url).hostname}</div>
+                                <div style={{ fontWeight: '500' }}>{getPasswordHost(p.url)}</div>
                                 <div style={{ fontSize: '12px', color: '#5f6368' }}>{p.username}</div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button
-                                    onClick={async () => {}}
+                                    onClick={() => handleCopy(p.id)}
                                     style={{ padding: '4px 8px', background: 'none', border: '1px solid #dadce0', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                                     title="Copy Password"
+                                    disabled={copyingPasswordId === p.id}
                                 >
-                                    Copy
+                                    {copyingPasswordId === p.id ? 'Copying...' : 'Copy'}
                                 </button>
                                 <button
                                     onClick={() => handleDelete(p.id)}

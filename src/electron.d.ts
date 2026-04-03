@@ -31,9 +31,10 @@ declare global {
             invoke(channel: 'extensions:action-click', name: string): Promise<void>;
 
             // Passwords
-            invoke(channel: 'passwords:save', data: { url: string; username: string; password: string }): Promise<boolean>;
+            invoke(channel: 'passwords:save', url: string, username: string, password: string): Promise<boolean>;
             invoke(channel: 'passwords:get', url: string): Promise<Array<{ username: string; password: string }>>;
             invoke(channel: 'passwords:list'): Promise<any[]>;
+            invoke(channel: 'passwords:copy', id: string): Promise<boolean>;
             invoke(channel: 'passwords:delete', id: string): Promise<void>;
 
             // Permissions

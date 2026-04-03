@@ -96,6 +96,25 @@ export class PasswordManager {
             .filter((c): c is { username: string; password: string } => c !== null);
     }
 
+    async getPasswordPlainText(id: string): Promise<string | null> {
+        if (!safeStorage.isEncryptionAvailable()) {
+            return null;
+        }
+
+        const entry = this.passwords.find((password) => password.id === id);
+        if (!entry) {
+            return null;
+        }
+
+        try {
+            const buffer = Buffer.from(entry.passwordEncrypted, 'base64');
+            return safeStorage.decryptString(buffer);
+        } catch (error) {
+            console.error('Failed to decrypt password:', error);
+            return null;
+        }
+    }
+
     getAllPasswords(): SavedPassword[] {
         return this.passwords;
     }

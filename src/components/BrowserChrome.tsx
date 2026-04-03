@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import TabBar from './TabBar';
 import NavigationControls from './NavigationControls';
@@ -7,15 +6,7 @@ import BookmarksBar from './BookmarksBar';
 import BrowserMenu from './BrowserMenu';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { Download, Book, EyeOff, Puzzle, Sparkles, Layers, BookOpen } from 'lucide-react';
-
-interface Tab {
-    id: string;
-    url: string;
-    title: string;
-    history: string[];
-    history_index: number;
-    groupId?: string;
-}
+import { BrowserTab } from '../types/browser';
 
 interface ExtensionAction {
     name: string;
@@ -24,7 +15,7 @@ interface ExtensionAction {
 }
 
 interface BrowserChromeProps {
-    tabs: Tab[];
+    tabs: BrowserTab[];
     activeTabId: string | null;
     onTabClick: (tabId: string) => void;
     onTabClose: (tabId: string) => void;

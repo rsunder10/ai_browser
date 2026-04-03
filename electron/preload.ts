@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('electron', {
             'ai:models',
             'ai:pull-model',
             'passwords:list',
+            'passwords:copy',
             'reader:toggle',
             'reader:status',
             'passwords:delete',

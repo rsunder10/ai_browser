@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, BrowserView, ipcMain, Menu, MenuItem, dialog, session } from 'electron';
+import { app, BrowserWindow, BrowserView, clipboard, ipcMain, Menu, MenuItem, dialog, session } from 'electron';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { TabManager } from './TabManager';
@@ -893,6 +893,16 @@ ipcMain.handle('passwords:get', async (event, url) => {
 
 ipcMain.handle('passwords:list', async () => {
     return passwordManager.getAllPasswords();
+});
+
+ipcMain.handle('passwords:copy', async (_event, id) => {
+    const password = await passwordManager.getPasswordPlainText(id);
+    if (!password) {
+        return false;
+    }
+
+    clipboard.writeText(password);
+    return true;
 });
 
 ipcMain.handle('passwords:delete', async (event, id) => {

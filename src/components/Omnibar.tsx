@@ -1,15 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, FileText, Globe, Bookmark, Command, Plus, Settings, Clock, Download, Puzzle, Trash2, ZoomIn, ZoomOut, RotateCcw, Printer, Terminal, Bot, EyeOff, Shield, VolumeX, X, BookOpen, Layers, Moon } from 'lucide-react';
 import './Omnibar.css';
-
-interface Tab {
-    id: string;
-    url: string;
-    title: string;
-}
+import { BrowserTabSummary } from '../types/browser';
 
 interface OmnibarProps {
-    tabs: Tab[];
+    tabs: BrowserTabSummary[];
     onTabClick: (tabId: string) => void;
     onNavigate: (url: string) => void;
     onNewTab: () => void;

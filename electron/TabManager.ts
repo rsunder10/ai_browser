@@ -102,15 +102,7 @@ export class TabManager {
         if (!tab || !tab.suspended || !this.mainWindow) return;
 
         this.log('Unsuspending tab:', tabId, tab.url);
-        const webPreferences: any = {
-            nodeIntegration: false,
-            contextIsolation: true,
-            sandbox: false,
-        };
-        if (tab.containerPartition) {
-            webPreferences.partition = tab.containerPartition;
-        }
-        const view = new BrowserView({ webPreferences });
+        const view = this.createBrowserView(tab.containerPartition);
 
         tab.view = view;
         tab.suspended = false;
@@ -164,6 +156,59 @@ export class TabManager {
         if (this.isDevelopment) {
             console.log('[TabManager]', ...args);
         }
+    }
+
+    private getInternalPageTitle(url: string): string {
+        switch (url) {
+            case 'neuralweb://home':
+                return 'Home';
+            case 'neuralweb://settings':
+                return 'Settings';
+            case 'neuralweb://downloads':
+                return 'Downloads';
+            case 'neuralweb://bookmarks':
+                return 'Bookmarks';
+            case 'neuralweb://history':
+                return 'History';
+            case 'neuralweb://settings/site':
+                return 'Site Settings';
+            case 'neuralweb://extensions':
+                return 'Extensions';
+            case 'neuralweb://privacy':
+                return 'Tracker Dashboard';
+            case 'neuralweb://cookies':
+                return 'Cookie Manager';
+            case 'neuralweb://reading-list':
+                return 'Reading List';
+            default:
+                return url;
+        }
+    }
+
+    private createBrowserView(containerPartition?: string): BrowserView {
+        const webPreferences: Electron.WebPreferences = {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+        };
+
+        if (containerPartition) {
+            webPreferences.partition = containerPartition;
+        }
+
+        return new BrowserView({ webPreferences });
+    }
+
+    private applyActiveViewBounds(view: BrowserView): void {
+        if (!this.mainWindow) return;
+
+        const bounds = this.mainWindow.getContentBounds();
+        view.setBounds({
+            x: 0,
+            y: this.CHROME_HEIGHT,
+            width: bounds.width - this.aiSidebarWidth,
+            height: bounds.height - this.CHROME_HEIGHT,
+        });
     }
 
     private sendTabUpdate(tabId: string) {
@@ -450,12 +495,7 @@ export class TabManager {
         const tabInfo: Tab = {
             id: tabId,
             url: url,
-            title: url === 'neuralweb://home' ? 'Home' :
-                url === 'neuralweb://settings' ? 'Settings' :
-                url === 'neuralweb://downloads' ? 'Downloads' :
-                url === 'neuralweb://bookmarks' ? 'Bookmarks' :
-                url === 'neuralweb://privacy' ? 'Tracker Dashboard' :
-                url === 'neuralweb://cookies' ? 'Cookie Manager' : url,
+            title: this.getInternalPageTitle(url),
             view: null as any,
             history: initialState?.history || [],
             historyIndex: initialState?.historyIndex || 0,
@@ -480,25 +520,10 @@ export class TabManager {
             ? url
             : `https://${url}`;
 
-        const webPrefsCreate: any = {
-            nodeIntegration: false,
-            contextIsolation: true,
-            sandbox: false,
-        };
-        if (tabInfo.containerPartition) {
-            webPrefsCreate.partition = tabInfo.containerPartition;
-        }
-        const view = new BrowserView({ webPreferences: webPrefsCreate });
+        const view = this.createBrowserView(tabInfo.containerPartition);
 
         mainWindow.addBrowserView(view);
-
-        const bounds = mainWindow.getContentBounds();
-        view.setBounds({
-            x: 0,
-            y: this.CHROME_HEIGHT,
-            width: bounds.width - this.aiSidebarWidth,
-            height: bounds.height - this.CHROME_HEIGHT,
-        });
+        this.applyActiveViewBounds(view);
 
         this.setupBrowserView(view, tabId);
 
@@ -577,14 +602,7 @@ export class TabManager {
         // Show selected view
         if (tab.view) {
             mainWindow.addBrowserView(tab.view);
-
-            const bounds = mainWindow.getContentBounds();
-            tab.view.setBounds({
-                x: 0,
-                y: this.CHROME_HEIGHT,
-                width: bounds.width - this.aiSidebarWidth,
-                height: bounds.height - this.CHROME_HEIGHT,
-            });
+            this.applyActiveViewBounds(tab.view);
         }
 
         this.activeTabId = tabId;
@@ -631,12 +649,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
             }
             tab.view = null as any;
             tab.url = url;
-            tab.title = url === 'neuralweb://home' ? 'Home' :
-                url === 'neuralweb://settings' ? 'Settings' :
-                url === 'neuralweb://downloads' ? 'Downloads' :
-                url === 'neuralweb://bookmarks' ? 'Bookmarks' :
-                url === 'neuralweb://privacy' ? 'Tracker Dashboard' :
-                url === 'neuralweb://cookies' ? 'Cookie Manager' : url;
+            tab.title = this.getInternalPageTitle(url);
             tab.suspended = false;
 
             this.sendTabUpdate(tabId);
@@ -657,24 +670,10 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
         }
 
         if (!tab.view && this.mainWindow) {
-            const webPrefsNav: any = {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: false,
-            };
-            if (tab.containerPartition) {
-                webPrefsNav.partition = tab.containerPartition;
-            }
-            const view = new BrowserView({ webPreferences: webPrefsNav });
+            const view = this.createBrowserView(tab.containerPartition);
 
             this.mainWindow.addBrowserView(view);
-            const bounds = this.mainWindow.getContentBounds();
-            view.setBounds({
-                x: 0,
-                y: this.CHROME_HEIGHT,
-                width: bounds.width - this.aiSidebarWidth,
-                height: bounds.height - this.CHROME_HEIGHT,
-            });
+            this.applyActiveViewBounds(view);
 
             tab.view = view;
             tab.suspended = false;
@@ -888,15 +887,10 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
     }
 
     repositionViews(mainWindow: BrowserWindow): void {
-        const bounds = mainWindow.getContentBounds();
+        this.mainWindow = mainWindow;
         this.tabs.forEach((tab) => {
             if (tab.id === this.activeTabId && tab.view) {
-                tab.view.setBounds({
-                    x: 0,
-                    y: this.CHROME_HEIGHT,
-                    width: bounds.width - this.aiSidebarWidth,
-                    height: bounds.height - this.CHROME_HEIGHT,
-                });
+                this.applyActiveViewBounds(tab.view);
             }
         });
     }
@@ -1042,16 +1036,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
         }
 
         // Create new view with partition
-        const webPreferences: any = {
-            nodeIntegration: false,
-            contextIsolation: true,
-            sandbox: false,
-        };
-        if (tab.containerPartition) {
-            webPreferences.partition = tab.containerPartition;
-        }
-
-        const view = new BrowserView({ webPreferences });
+        const view = this.createBrowserView(tab.containerPartition);
         tab.view = view;
         tab.suspended = false;
 
@@ -1059,13 +1044,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
 
         if (isActive) {
             this.mainWindow.addBrowserView(view);
-            const bounds = this.mainWindow.getContentBounds();
-            view.setBounds({
-                x: 0,
-                y: this.CHROME_HEIGHT,
-                width: bounds.width - this.aiSidebarWidth,
-                height: bounds.height - this.CHROME_HEIGHT,
-            });
+            this.applyActiveViewBounds(view);
         }
 
         // Reload the URL
@@ -1099,13 +1078,7 @@ button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; 
         if (tab && tab.view) {
             if (visible) {
                 this.mainWindow.addBrowserView(tab.view);
-                const bounds = this.mainWindow.getContentBounds();
-                tab.view.setBounds({
-                    x: 0,
-                    y: this.CHROME_HEIGHT,
-                    width: bounds.width - this.aiSidebarWidth,
-                    height: bounds.height - this.CHROME_HEIGHT,
-                });
+                this.applyActiveViewBounds(tab.view);
             } else {
                 this.mainWindow.removeBrowserView(tab.view);
             }

@@ -90,6 +90,7 @@ Turn the browser into a workspace tool, not just a page viewer.
 - Side-by-side tabs in a single window using two BrowserViews
 - Drag a tab to the right edge to activate split mode
 - Adjustable divider between panes
+- Depends on the multi-pane tab orchestration refactor landing first
 - **Files:** `electron/TabManager.ts`, `src/App.tsx`, `src/App.css`
 
 ### 3.4 Web Clipper & Annotations
@@ -165,7 +166,7 @@ Features for users who live in their browser.
 - Uses separate Electron sessions and Store directories per profile
 - **Files:** new `electron/managers/ProfileManager.ts`, `electron/main.ts`, `electron/utils/Store.ts`
 
-### 5.2 Custom Search Engines
+### ✅ 5.2 Custom Search Engines
 - Add any search engine with a `%s` URL pattern
 - Assign keyword shortcuts (e.g., `g query` for Google, `w query` for Wikipedia)
 - Manage from settings page
@@ -234,13 +235,13 @@ Ship-quality infrastructure.
 | **2** | Privacy & Security | 5 | 5 | ✅ Complete |
 | **3** | Productivity | 3 | 5 | 🟡 In Progress |
 | **4** | UX Polish | 2 | 6 | 🟡 In Progress |
-| **5** | Power User | 0 | 6 | ⬜ Not Started |
+| **5** | Power User | 1 | 6 | 🟡 In Progress |
 | **6** | Production | 0 | 4 | ⬜ Not Started |
-| | **Total** | **15** | **31** | **48%** |
+| | **Total** | **16** | **31** | **52%** |
 
 ### Next Priorities
-1. **Split View** (3.3) — High impact for productivity users
-2. **Tab Hover Previews** (4.2) — Quick win for polish
-3. **Picture-in-Picture** (4.4) — Expected modern browser feature
-4. **Custom Search Engines** (5.2) — Power user table stakes
-5. **Onboarding Flow** (6.4) — Critical for new user retention
+1. **Tab Hover Previews** (4.2) — Safe polish win with clear user value
+2. **Onboarding Flow** (6.4) — Improves first-run activation before the next big UI jump
+3. **Split View** (3.3) — Valuable, but only after the orchestration refactor is in place
+4. **Picture-in-Picture** (4.4) — Expected modern browser feature
+5. **Profiles** (5.1) — Shares the same state/core constraints as split view

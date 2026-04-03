@@ -8,7 +8,7 @@ Based on a comprehensive review of the codebase, the following features are reco
 - [x] **Zoom Controls**: Menu and shortcuts implemented.
 - [x] **Print Support**: Basic print functionality implemented.
 - [x] **Site Settings**: Permissions management implemented.
-- [x] **Custom Search Engines**: Configurable in Settings (Google, DuckDuckGo, Bing).
+- [x] **Custom Search Engines**: User-defined engines with `%s` patterns, editable defaults, and keyword shortcuts.
 - [x] **Incognito Mode**: Implemented.
 - [x] **AI Assistant Backend**: Full Ollama integration with streaming.
 - [x] **Reader Mode**: Implemented with toggle button.
@@ -40,11 +40,10 @@ Based on a comprehensive review of the codebase, the following features are reco
 ## Next Suggestions
 
 ### High Priority
-- **Split View**: Side-by-side tabs using two BrowserViews.
 - **Tab Hover Previews**: Thumbnail preview on tab hover via `capturePage()`.
-- **Picture-in-Picture**: Floating video player that persists across tabs.
-- **Custom Search Engines**: User-defined engines with `%s` patterns and keyword shortcuts.
 - **Onboarding Flow**: First-run wizard for setup and feature tour.
+- **Split View**: Side-by-side tabs using two BrowserViews, after the tab/window orchestration refactor.
+- **Picture-in-Picture**: Floating video player that persists across tabs.
 
 ### Medium Priority
 - **Web Clipper & Annotations**: Highlight text, save clips with notes.

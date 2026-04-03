@@ -77,6 +77,7 @@ neural-web/
 - Address bar with SSL indicators
 - Tab groups with color coding
 - Tab pinning and muting
+- Custom search engines with `%s` templates and keyword shortcuts
 - Bookmarks and bookmarks bar
 - Browsing history with search
 - Download manager

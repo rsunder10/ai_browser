@@ -1,15 +1,6 @@
-
 import { X, Plus, Folder, Pin, VolumeX, Sparkles, Container } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
-
-interface Tab {
-    id: string;
-    url: string;
-    title: string;
-    groupId?: string;
-    pinned?: boolean;
-    muted?: boolean;
-}
+import { useState, useEffect } from 'react';
+import { BrowserTab } from '../types/browser';
 
 interface TabGroup {
     id: string;
@@ -19,7 +10,7 @@ interface TabGroup {
 }
 
 interface TabBarProps {
-    tabs: Tab[];
+    tabs: BrowserTab[];
     activeTabId: string | null;
     onTabClick: (tabId: string) => void;
     onTabClose: (tabId: string) => void;
@@ -139,8 +130,6 @@ export default function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
     // Drag & drop state
     const [dragTabId, setDragTabId] = useState<string | null>(null);
     const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-    const dragRef = useRef<{ startX: number; tabId: string } | null>(null);
-
     const handleDragStart = (e: React.DragEvent, tabId: string) => {
         setDragTabId(tabId);
         e.dataTransfer.effectAllowed = 'move';

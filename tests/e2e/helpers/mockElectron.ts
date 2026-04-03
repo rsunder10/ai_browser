@@ -28,6 +28,29 @@ export function installMockElectron() {
         groups: [],
         settings: {
             searchEngine: 'google',
+            searchEngines: [
+                {
+                    id: 'google',
+                    name: 'Google',
+                    template: 'https://www.google.com/search?q=%s',
+                    keyword: 'g',
+                    isBuiltIn: true,
+                },
+                {
+                    id: 'duckduckgo',
+                    name: 'DuckDuckGo',
+                    template: 'https://duckduckgo.com/?q=%s',
+                    keyword: 'd',
+                    isBuiltIn: true,
+                },
+                {
+                    id: 'bing',
+                    name: 'Bing',
+                    template: 'https://www.bing.com/search?q=%s',
+                    keyword: 'b',
+                    isBuiltIn: true,
+                },
+            ],
             theme: 'system',
             accentColor: '#1a73e8',
             themePreset: 'default',
@@ -141,6 +164,8 @@ export function installMockElectron() {
                         return { models: [] };
                     case 'passwords:list':
                         return [];
+                    case 'passwords:copy':
+                        return true;
                     default:
                         return null;
                 }

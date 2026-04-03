@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './AISidebar.css';
-
-interface TabInfo {
-    id: string;
-    url: string;
-    title: string;
-}
+import { BrowserTabSummary } from '../types/browser';
 
 interface AISidebarProps {
     isOpen: boolean;
@@ -14,7 +9,7 @@ interface AISidebarProps {
     currentUrl: string;
     pendingExplainText?: string | null;
     onExplainConsumed?: () => void;
-    tabs?: TabInfo[];
+    tabs?: BrowserTabSummary[];
 }
 
 interface Message {
